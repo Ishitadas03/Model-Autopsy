@@ -16,11 +16,13 @@ export function AppShell({
   experimentId,
 }: AppShellProps) {
   return (
-    <div className="min-h-screen bg-bg flex flex-col bg-grid-subtle">
+    <div className="relative min-h-screen text-text flex flex-col">
+      {/* Top Glass Navigation Bar */}
       <TopBar />
-      <div className="flex-1 flex max-w-[1600px] w-full mx-auto">
+
+      <div className="relative z-10 flex-1 flex max-w-[1600px] w-full mx-auto">
         {showSidebar && <Sidebar experimentId={experimentId} />}
-        <main className="flex-1 flex flex-col min-w-0 p-6 md:p-8">
+        <main className="flex-1 flex flex-col min-w-0 p-6 md:p-8 relative">
           {children}
         </main>
       </div>

@@ -27,7 +27,7 @@ interface StepperProps {
 
 export function Stepper({ currentStep, onStepClick, completedSteps }: StepperProps) {
   return (
-    <div className="w-full py-4 mb-6">
+    <div className="w-full py-4 mb-8">
       <div className="flex items-center justify-between max-w-4xl mx-auto px-4 relative">
         {WORKSPACE_STEPS.map((step, index) => {
           const isCompleted = completedSteps.includes(step.id);
@@ -43,28 +43,28 @@ export function Stepper({ currentStep, onStepClick, completedSteps }: StepperPro
                   onClick={() => isClickable && onStepClick(step.id)}
                   disabled={!isClickable}
                   aria-current={isActive ? 'step' : undefined}
-                  className={`w-11 h-11 rounded-full flex items-center justify-center font-manrope font-semibold text-xs transition-all duration-300 ${
+                  className={`w-11 h-11 rounded-full flex items-center justify-center font-mono font-bold text-xs transition-all duration-300 ${
                     isActive
-                      ? 'bg-white text-black ring-4 ring-white/20 shadow-[0_0_20px_rgba(255,255,255,0.4)] scale-105'
+                      ? 'bg-white text-black ring-4 ring-sky-400/30 shadow-[0_0_24px_rgba(56,189,248,0.5)] scale-110'
                       : isCompleted
-                      ? 'bg-surface-2 border border-white/40 text-white hover:border-white cursor-pointer'
-                      : 'bg-surface border border-border text-text-subtle cursor-not-allowed opacity-60'
+                      ? 'bg-[#0a0c16] border border-sky-400/60 text-sky-400 shadow-[0_0_12px_rgba(56,189,248,0.25)] hover:border-sky-300 cursor-pointer'
+                      : 'bg-[#0a0c16]/60 border border-white/10 text-white/30 cursor-not-allowed opacity-60'
                   }`}
                 >
                   {isCompleted ? (
-                    <Check className="w-5 h-5 text-white stroke-[2.5]" />
+                    <Check className="w-5 h-5 text-sky-400 stroke-[2.5]" />
                   ) : (
                     <span>{step.number}</span>
                   )}
                 </button>
 
                 <span
-                  className={`mt-2 text-xs font-cabin uppercase tracking-wider transition-colors ${
+                  className={`mt-2.5 text-xs font-mono uppercase tracking-wider transition-colors ${
                     isActive
-                      ? 'text-white font-semibold'
+                      ? 'text-white font-bold drop-shadow-[0_0_8px_rgba(255,255,255,0.4)]'
                       : isCompleted
-                      ? 'text-text-muted'
-                      : 'text-text-subtle'
+                      ? 'text-sky-400/90 font-medium'
+                      : 'text-white/40'
                   }`}
                 >
                   {step.title}
@@ -73,9 +73,9 @@ export function Stepper({ currentStep, onStepClick, completedSteps }: StepperPro
 
               {/* Progress connector line */}
               {index < WORKSPACE_STEPS.length - 1 && (
-                <div className="flex-1 mx-3 h-[2px] bg-border relative -top-3 overflow-hidden rounded">
+                <div className="flex-1 mx-3 h-[2px] bg-white/10 relative -top-3 overflow-hidden rounded">
                   <motion.div
-                    className="absolute inset-y-0 left-0 bg-white"
+                    className="absolute inset-y-0 left-0 bg-gradient-to-r from-sky-400 to-blue-500 shadow-[0_0_8px_#38bdf8]"
                     initial={false}
                     animate={{
                       scaleX: completedSteps.includes(step.id) || currentStep > step.id ? 1 : 0,

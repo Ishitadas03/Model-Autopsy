@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import {
-  LineChart,
+  ComposedChart,
+  Area,
   Line,
   XAxis,
   YAxis,
@@ -11,7 +12,7 @@ import {
   ResponsiveContainer,
   ReferenceLine,
 } from 'recharts';
-import { Table as TableIcon, Download, SlidersHorizontal, Activity } from 'lucide-react';
+import { Table as TableIcon, Download, Activity, AlertCircle, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/Button';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/Table';
 
@@ -74,18 +75,83 @@ export function RobustnessCurve({
     document.body.removeChild(link);
   };
 
+  // High-Tech Glassmorphic Tooltip
+  const CustomTooltip = ({ active, payload, label }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      const currentValue = data[activeMetric];
+      const baselineVal = data.baseline;
+      const isBreached = currentValue !== undefined && currentValue < failureThreshold;
+      const delta = baselineVal && currentValue ? (((currentValue - baselineVal) / baselineVal) * 100).toFixed(1) : null;
+
+      return (
+        <div className="p-3.5 rounded-xl bg-[#090b14]/95 backdrop-blur-2xl border border-white/20 shadow-[0_16px_36px_rgba(0,0,0,0.9),0_0_20px_rgba(239,68,68,0.2)] text-white text-xs font-mono min-w-[210px] space-y-2">
+          <div className="flex items-center justify-between pb-2 border-b border-white/10">
+            <span className="text-white/60 text-[10px] uppercase font-semibold">Severity Tier</span>
+            <span className="font-bold text-sky-400 bg-sky-500/10 px-1.5 py-0.5 rounded border border-sky-500/20">
+              {label}
+            </span>
+          </div>
+
+          <div className="space-y-1.5">
+            <div className="flex items-center justify-between">
+              <span className="text-white/70">Random Forest:</span>
+              <span className="font-bold text-white text-sm">
+                {currentValue !== undefined ? currentValue : '—'}
+              </span>
+            </div>
+
+            {delta && (
+              <div className="flex items-center justify-between text-[11px]">
+                <span className="text-white/50">Delta vs Base:</span>
+                <span className={`font-semibold ${parseFloat(delta) < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+                  {delta}%
+                </span>
+              </div>
+            )}
+
+            {showOverlay && data.svmF1 && (
+              <div className="flex items-center justify-between text-[11px] pt-1 border-t border-white/5">
+                <span className="text-cyan-400">SVM Classifier:</span>
+                <span className="font-semibold text-cyan-300">{data.svmF1}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-2 border-t border-white/10 flex items-center justify-between text-[10px]">
+            <span className="text-white/50">Threshold: {failureThreshold}</span>
+            {isBreached ? (
+              <span className="flex items-center gap-1 text-rose-400 font-bold bg-rose-500/15 px-1.5 py-0.5 rounded border border-rose-500/30">
+                <ShieldAlert className="w-3 h-3" />
+                FAIL ZONE
+              </span>
+            ) : (
+              <span className="text-emerald-400 font-medium bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                NOMINAL
+              </span>
+            )}
+          </div>
+        </div>
+      );
+    }
+    return null;
+  };
+
   return (
-    <div className="p-6 rounded-xl bg-surface border border-border shadow-xl space-y-4">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-3 border-b border-white/5">
+    <div className="p-6 rounded-2xl bg-[#0a0c16]/85 backdrop-blur-xl border border-white/12 shadow-[0_16px_40px_rgba(0,0,0,0.7)] space-y-5">
+      {/* Chart Top Header & Actions */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-white/10">
         <div>
           <div className="flex items-center gap-2">
-            <Activity className="w-4 h-4 text-accent" />
-            <h3 className="font-manrope font-semibold text-sm text-white">
+            <div className="p-1.5 rounded-lg bg-rose-500/10 border border-rose-500/30 text-rose-400 shadow-[0_0_10px_rgba(244,63,94,0.2)]">
+              <Activity className="w-4 h-4" />
+            </div>
+            <h3 className="font-manrope font-bold text-base text-white">
               Robustness Degradation Curve
             </h3>
           </div>
-          <p className="text-xs text-text-subtle mt-0.5">
-            Model performance under escalating noise perturbation severities.
+          <p className="text-xs text-white/50 mt-1">
+            Empirical accuracy cliff-edge under controlled stress perturbations.
           </p>
         </div>
 
@@ -96,7 +162,7 @@ export function RobustnessCurve({
             variant={showOverlay ? 'primary' : 'secondary'}
             size="sm"
             onClick={() => setShowOverlay(!showOverlay)}
-            className="text-xs gap-1"
+            className="text-xs gap-1.5 rounded-full"
           >
             <span>Compare: SVM</span>
           </Button>
@@ -106,7 +172,7 @@ export function RobustnessCurve({
             variant={showTable ? 'primary' : 'secondary'}
             size="sm"
             onClick={() => setShowTable(!showTable)}
-            className="text-xs gap-1.5"
+            className="text-xs gap-1.5 rounded-full"
             aria-label="Toggle accessible data table view"
           >
             <TableIcon className="w-3.5 h-3.5" />
@@ -117,7 +183,7 @@ export function RobustnessCurve({
             variant="secondary"
             size="sm"
             onClick={handleExportCsv}
-            className="text-xs gap-1.5"
+            className="text-xs gap-1.5 rounded-full"
           >
             <Download className="w-3.5 h-3.5" />
             <span>Export CSV</span>
@@ -130,7 +196,7 @@ export function RobustnessCurve({
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
-              <TableRow>
+              <TableRow className="border-white/10">
                 <TableHead>Noise Severity</TableHead>
                 <TableHead>{metricLabel}</TableHead>
                 <TableHead>Baseline</TableHead>
@@ -140,17 +206,17 @@ export function RobustnessCurve({
             </TableHeader>
             <TableBody>
               {displayData.map((row, idx) => (
-                <TableRow key={idx}>
+                <TableRow key={idx} className="border-white/5 hover:bg-white/[0.02]">
                   <TableCell className="font-mono text-white font-medium">
                     {row.severityPercent}
                   </TableCell>
-                  <TableCell className="font-mono text-white font-semibold">
+                  <TableCell className="font-mono text-rose-400 font-bold">
                     {row[activeMetric] ?? '—'}
                   </TableCell>
-                  <TableCell className="font-mono text-text-subtle">
+                  <TableCell className="font-mono text-white/60">
                     {row.baseline}
                   </TableCell>
-                  <TableCell className="font-mono text-accent">
+                  <TableCell className="font-mono text-rose-500 font-semibold">
                     {row.threshold}
                   </TableCell>
                   {showOverlay && (
@@ -166,87 +232,102 @@ export function RobustnessCurve({
       ) : (
         /* Recharts Visualization */
         <div className="space-y-4">
-          {/* Chart Legend with accessible markers & dash descriptions */}
-          <div className="flex items-center gap-6 text-xs font-mono flex-wrap pt-1">
+          {/* Chart Legend with interactive indicators */}
+          <div className="flex items-center gap-6 text-xs font-mono flex-wrap pt-1 select-none">
             <div className="flex items-center gap-2">
               <span className="w-4 h-0.5 bg-white border-t border-dashed" />
-              <span className="text-white">Clean Baseline ({curveData[0]?.baseline})</span>
+              <span className="text-white/80">Clean Baseline ({curveData[0]?.baseline})</span>
             </div>
             <div className="flex items-center gap-2">
-              <span className="w-3 h-3 rounded-full bg-accent inline-block" />
-              <span className="text-accent font-medium">Stressed Model (Random Forest)</span>
+              <span className="w-3 h-3 rounded-full bg-rose-500 shadow-[0_0_8px_#f43f5e] inline-block" />
+              <span className="text-rose-400 font-semibold">Stressed Model (Random Forest)</span>
             </div>
             {showOverlay && (
               <div className="flex items-center gap-2">
-                <span className="w-3 h-3 bg-cyan-400 rotate-45 inline-block" />
-                <span className="text-cyan-400">SVM Classifier</span>
+                <span className="w-3 h-3 bg-cyan-400 rotate-45 shadow-[0_0_8px_#22d3ee] inline-block" />
+                <span className="text-cyan-400 font-semibold">SVM Classifier</span>
               </div>
             )}
             <div className="flex items-center gap-2">
-              <span className="w-4 h-0.5 bg-accent border-t-2 border-dotted" />
-              <span className="text-text-subtle">Failure Threshold ({failureThreshold})</span>
+              <span className="w-4 h-0.5 bg-rose-500/80 border-t-2 border-dotted" />
+              <span className="text-white/50">Failure Threshold ({failureThreshold})</span>
             </div>
             {observedBoundary && (
               <div className="flex items-center gap-2">
-                <span className="w-0.5 h-3 bg-yellow-400 inline-block" />
-                <span className="text-yellow-400 font-semibold">
+                <span className="w-1 h-3.5 bg-amber-400 rounded-sm shadow-[0_0_8px_#fbbf24] inline-block" />
+                <span className="text-amber-400 font-bold">
                   Boundary ≈ {(observedBoundary * 100).toFixed(1)}%
                 </span>
               </div>
             )}
           </div>
 
-          <div className="h-72 w-full">
+          <div className="h-80 w-full pt-2">
             <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={displayData} margin={{ top: 15, right: 30, left: -10, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" />
+              <ComposedChart data={displayData} margin={{ top: 20, right: 30, left: -10, bottom: 5 }}>
+                <defs>
+                  {/* Stressed Degradation Curve Gradient */}
+                  <linearGradient id="curveGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#f43f5e" stopOpacity={0.4} />
+                    <stop offset="60%" stopColor="#f43f5e" stopOpacity={0.12} />
+                    <stop offset="95%" stopColor="#f43f5e" stopOpacity={0.0} />
+                  </linearGradient>
+
+                  {/* Multi-model comparison gradient */}
+                  <linearGradient id="svmGradient" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#06b6d4" stopOpacity={0.3} />
+                    <stop offset="95%" stopColor="#06b6d4" stopOpacity={0.0} />
+                  </linearGradient>
+                </defs>
+
+                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.06)" vertical={false} />
+
                 <XAxis
                   dataKey="severityPercent"
                   stroke="rgba(255,255,255,0.4)"
                   fontSize={11}
                   fontFamily="monospace"
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
                 />
                 <YAxis
                   domain={isLowerBetter ? [0, 'auto'] : [0.65, 1.0]}
                   stroke="rgba(255,255,255,0.4)"
                   fontSize={11}
                   fontFamily="monospace"
+                  tickLine={false}
+                  axisLine={{ stroke: 'rgba(255,255,255,0.1)' }}
                 />
-                <Tooltip
-                  contentStyle={{
-                    backgroundColor: '#0c0c0f',
-                    borderColor: 'rgba(255,255,255,0.2)',
-                    borderRadius: '8px',
-                    fontSize: '11px',
-                    fontFamily: 'monospace',
-                  }}
-                />
+
+                <Tooltip content={<CustomTooltip />} />
 
                 {/* Horizontal Baseline line */}
                 <ReferenceLine
                   y={curveData[0]?.baseline}
                   stroke="#ffffff"
                   strokeDasharray="4 4"
-                  strokeOpacity={0.7}
+                  strokeOpacity={0.6}
                   label={{
                     value: `Baseline (${curveData[0]?.baseline})`,
                     fill: '#ffffff',
                     fontSize: 10,
                     position: 'insideTopLeft',
+                    fontFamily: 'monospace',
                   }}
                 />
 
                 {/* Horizontal Failure Threshold line */}
                 <ReferenceLine
                   y={failureThreshold}
-                  stroke="#ef4444"
+                  stroke="#f43f5e"
                   strokeDasharray="3 3"
                   strokeOpacity={0.8}
                   label={{
                     value: `Failure Threshold (${failureThreshold})`,
-                    fill: '#ef4444',
+                    fill: '#f43f5e',
                     fontSize: 10,
                     position: 'insideBottomRight',
+                    fontFamily: 'monospace',
                   }}
                 />
 
@@ -254,51 +335,76 @@ export function RobustnessCurve({
                 {observedBoundary && (
                   <ReferenceLine
                     x={`${(observedBoundary * 100).toFixed(1)}%`}
-                    stroke="#f59e0b"
+                    stroke="#fbbf24"
                     strokeDasharray="3 3"
                     strokeWidth={1.5}
                     label={{
                       value: `Boundary: ${(observedBoundary * 100).toFixed(1)}%`,
-                      fill: '#f59e0b',
+                      fill: '#fbbf24',
                       fontSize: 10,
                       position: 'top',
+                      fontFamily: 'monospace',
                     }}
                   />
                 )}
 
-                {/* Stressed Line (Solid Red with Circle dots) */}
+                {/* Shaded Area Under Primary Curve */}
+                <Area
+                  type="monotone"
+                  dataKey={activeMetric}
+                  fill="url(#curveGradient)"
+                  stroke="none"
+                  isAnimationActive
+                  animationDuration={1000}
+                />
+
+                {/* Primary Stressed Line (Glowing Red with Ring Dots) */}
                 <Line
                   type="monotone"
                   dataKey={activeMetric}
                   name="Random Forest"
-                  stroke="#ef4444"
-                  strokeWidth={2.5}
-                  dot={{ r: 4, fill: '#ef4444', strokeWidth: 1, stroke: '#ffffff' }}
-                  activeDot={{ r: 6 }}
+                  stroke="#f43f5e"
+                  strokeWidth={3}
+                  dot={{ r: 4.5, fill: '#0a0c16', strokeWidth: 2, stroke: '#f43f5e' }}
+                  activeDot={{ r: 7, fill: '#f43f5e', stroke: '#ffffff', strokeWidth: 2.5 }}
                   isAnimationActive
-                  animationDuration={900}
+                  animationDuration={1000}
                 />
 
-                {/* Multi-model comparison line (Cyan with Diamond dots) */}
+                {/* Multi-model comparison line (Cyan) */}
                 {showOverlay && (
-                  <Line
-                    type="monotone"
-                    dataKey="svmF1"
-                    name="SVM Classifier"
-                    stroke="#22d3ee"
-                    strokeWidth={2}
-                    strokeDasharray="5 5"
-                    dot={{ r: 4, fill: '#22d3ee' }}
-                    activeDot={{ r: 6 }}
-                    isAnimationActive
-                    animationDuration={900}
-                  />
+                  <>
+                    <Area
+                      type="monotone"
+                      dataKey="svmF1"
+                      fill="url(#svmGradient)"
+                      stroke="none"
+                      isAnimationActive
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="svmF1"
+                      name="SVM"
+                      stroke="#06b6d4"
+                      strokeWidth={2}
+                      strokeDasharray="4 4"
+                      dot={{ r: 4, fill: '#06b6d4', strokeWidth: 1.5, stroke: '#ffffff' }}
+                      activeDot={{ r: 6 }}
+                      isAnimationActive
+                    />
+                  </>
                 )}
-              </LineChart>
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </div>
       )}
+
+      {/* Mandatory scientific caption under the curve */}
+      <div className="pt-2 border-t border-white/5 flex items-center gap-2 text-[11px] text-white/40 italic">
+        <AlertCircle className="w-3.5 h-3.5 text-white/40 shrink-0" />
+        <span>Observed failure boundary under the specified experimental configuration.</span>
+      </div>
     </div>
   );
 }

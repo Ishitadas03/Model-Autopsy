@@ -72,20 +72,22 @@ export function ExperimentPreview({ config, step }: ExperimentPreviewProps) {
 
   return (
     <aside className="w-full lg:w-80 flex-shrink-0 sticky top-24 self-start">
-      <div className="bg-surface rounded-xl border border-border p-5 shadow-xl relative overflow-hidden">
-        {/* Subtle accent glow top-right */}
-        <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full blur-2xl pointer-events-none" />
+      <div className="bg-[#090b14]/90 backdrop-blur-2xl rounded-2xl border border-white/12 border-t-2 border-t-sky-400/60 p-6 shadow-[0_16px_40px_rgba(0,0,0,0.8)] relative overflow-hidden">
+        {/* Subtle cyan ambient glow top-right */}
+        <div className="absolute top-0 right-0 w-36 h-36 bg-sky-500/10 rounded-full blur-2xl pointer-events-none" />
 
-        <div className="flex items-center justify-between pb-3 border-b border-white/5 mb-4">
+        <div className="flex items-center justify-between pb-3.5 border-b border-white/10 mb-4">
           <div className="flex items-center gap-2">
-            <Sparkles className="w-4 h-4 text-accent" />
-            <h3 className="font-manrope font-semibold text-sm text-white">
-              Experiment Preview
+            <div className="p-1.5 rounded-lg bg-sky-500/10 border border-sky-500/20 text-sky-400">
+              <Sparkles className="w-4 h-4" />
+            </div>
+            <h3 className="font-manrope font-bold text-sm text-white">
+              Experiment Manifest
             </h3>
           </div>
-          <Badge variant="outline" className="text-[10px] text-text-subtle">
+          <span className="font-mono text-[10px] text-sky-400 bg-sky-500/10 px-2 py-0.5 rounded-full border border-sky-500/20 font-semibold uppercase">
             Step {step} of 5
-          </Badge>
+          </span>
         </div>
 
         <div className="space-y-3.5">
@@ -98,8 +100,8 @@ export function ExperimentPreview({ config, step }: ExperimentPreviewProps) {
                 key={f.label}
                 className="flex items-start justify-between gap-3 text-xs"
               >
-                <div className="flex items-center gap-2 text-text-subtle font-cabin">
-                  <Icon className="w-3.5 h-3.5 text-text-subtle/70" />
+                <div className="flex items-center gap-2 text-white/50 font-mono">
+                  <Icon className="w-3.5 h-3.5 text-white/40" />
                   <span>{f.label}</span>
                 </div>
 
@@ -112,7 +114,7 @@ export function ExperimentPreview({ config, step }: ExperimentPreviewProps) {
                         animate={{ opacity: 1, y: 0 }}
                         exit={{ opacity: 0, y: 4 }}
                         transition={{ duration: 0.2 }}
-                        className="text-white font-manrope font-semibold"
+                        className="text-white font-manrope font-semibold text-xs"
                       >
                         {f.value}
                       </motion.span>
@@ -122,7 +124,7 @@ export function ExperimentPreview({ config, step }: ExperimentPreviewProps) {
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 0.4 }}
                         exit={{ opacity: 0 }}
-                        className="text-text-subtle"
+                        className="text-white/30 font-mono"
                       >
                         —
                       </motion.span>
@@ -135,9 +137,9 @@ export function ExperimentPreview({ config, step }: ExperimentPreviewProps) {
         </div>
 
         {/* Live validation summary status */}
-        <div className="mt-6 pt-4 border-t border-white/5">
-          <p className="text-[11px] text-text-subtle font-cabin leading-relaxed">
-            Experiments are versioned and seeded for reproducible stress-testing.
+        <div className="mt-6 pt-4 border-t border-white/10">
+          <p className="text-[11px] text-white/40 font-mono leading-relaxed">
+            Deterministic seeds & immutable manifests guarantee byte-for-byte reproducibility.
           </p>
         </div>
       </div>

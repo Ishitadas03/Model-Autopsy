@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Manrope, Cabin, Instrument_Serif, Inter } from 'next/font/google';
 import './globals.css';
 import { MotionProvider } from '@/components/motion/MotionProvider';
+import { GlobalAnimatedBackground } from '@/components/landing/GlobalAnimatedBackground';
 
 const manrope = Manrope({
   subsets: ['latin'],
@@ -48,8 +49,11 @@ export default function RootLayout({
       lang="en"
       className={`${manrope.variable} ${cabin.variable} ${instrumentSerif.variable} ${inter.variable}`}
     >
-      <body className="min-h-screen bg-bg text-text font-inter selection:bg-accent/30 selection:text-white">
-        <MotionProvider>{children}</MotionProvider>
+      <body className="min-h-screen bg-bg text-text font-inter selection:bg-accent/30 selection:text-white relative">
+        <MotionProvider>
+          <GlobalAnimatedBackground />
+          <div className="relative z-10 min-h-screen flex flex-col">{children}</div>
+        </MotionProvider>
       </body>
     </html>
   );

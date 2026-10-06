@@ -34,10 +34,7 @@ export default function LandingPage() {
   const words = ['Find', 'out', 'why', 'AI', 'Models'];
 
   return (
-    <div className="relative min-h-screen bg-bg text-text selection:bg-accent/30 selection:text-white overflow-x-hidden">
-      {/* Cinematic Full-Page Continuous Animated Background */}
-      <GlobalAnimatedBackground />
-
+    <div className="relative min-h-screen text-text selection:bg-accent/30 selection:text-white overflow-x-hidden">
       {/* Dynamic Landing Navbar */}
       <LandingNavbar />
 

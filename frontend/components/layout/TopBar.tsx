@@ -3,7 +3,7 @@
 import React, { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Bell, Menu, X } from 'lucide-react';
+import { Bell, Menu, X, Radio } from 'lucide-react';
 import { Logo } from '../ui/Logo';
 import { CommandStatus } from './CommandStatus';
 import { MobileNav } from './MobileNav';
@@ -22,8 +22,8 @@ export function TopBar() {
 
   return (
     <>
-      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-bg/90 backdrop-blur-md">
-        <div className="max-w-[1440px] mx-auto h-16 px-6 flex items-center justify-between gap-4">
+      <header className="sticky top-0 z-40 w-full border-b border-white/10 bg-[#060812]/85 backdrop-blur-2xl shadow-lg">
+        <div className="max-w-[1600px] mx-auto h-16 px-6 flex items-center justify-between gap-4">
           <div className="flex items-center gap-8">
             <Logo size="md" />
 
@@ -35,15 +35,15 @@ export function TopBar() {
                   <Link
                     key={link.href}
                     href={link.href}
-                    className={`relative py-1 text-xs font-manrope font-medium transition-colors ${
+                    className={`relative py-1 text-xs font-manrope font-semibold transition-colors ${
                       isActive
                         ? 'text-white'
-                        : 'text-text-muted hover:text-white'
+                        : 'text-white/60 hover:text-white'
                     }`}
                   >
                     <span>{link.label}</span>
                     {isActive && (
-                      <span className="absolute bottom-0 left-0 right-0 h-[2px] bg-white rounded-full" />
+                      <span className="absolute -bottom-2.5 left-0 right-0 h-[2px] bg-gradient-to-r from-sky-400 via-cyan-300 to-sky-400 shadow-[0_0_8px_#38bdf8] rounded-full" />
                     )}
                   </Link>
                 );
@@ -57,15 +57,15 @@ export function TopBar() {
             {/* Notifications Button */}
             <button
               type="button"
-              className="p-2 rounded-md text-text-subtle hover:text-white hover:bg-white/5 transition-colors"
+              className="p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 border border-transparent hover:border-white/10 transition-colors"
               aria-label="View notifications"
             >
               <Bell className="w-4 h-4" aria-hidden="true" />
             </button>
 
-            {/* Square Avatar "U" */}
+            {/* Avatar Pill */}
             <div
-              className="w-8 h-8 rounded-[6px] bg-surface-2 border border-white/15 flex items-center justify-center font-manrope font-bold text-xs text-white select-none"
+              className="w-8 h-8 rounded-lg bg-surface-2 border border-white/15 flex items-center justify-center font-manrope font-bold text-xs text-white shadow-inner select-none hover:border-sky-400/50 transition-colors"
               title="Current User"
             >
               U
@@ -75,7 +75,7 @@ export function TopBar() {
             <button
               type="button"
               onClick={() => setMobileOpen(!mobileOpen)}
-              className="lg:hidden p-2 rounded-md text-text-subtle hover:text-white hover:bg-white/5 transition-colors"
+              className="lg:hidden p-2 rounded-lg text-white/60 hover:text-white hover:bg-white/5 transition-colors"
               aria-label="Toggle navigation menu"
             >
               {mobileOpen ? (

@@ -1,0 +1,69 @@
+<svg viewBox="0 0 600 600" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <radialGradient id="brainGlow" cx="50%" cy="50%" r="50%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.12"/>
+      <stop offset="70%" stop-color="#ef4444" stop-opacity="0.04"/>
+      <stop offset="100%" stop-color="#050506" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="neuralStroke" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" stop-opacity="0.7"/>
+      <stop offset="50%" stop-color="#888899" stop-opacity="0.4"/>
+      <stop offset="100%" stop-color="#ef4444" stop-opacity="0.6"/>
+    </linearGradient>
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="3" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+
+  <!-- Ambient Backing Glow -->
+  <circle cx="300" cy="300" r="260" fill="url(#brainGlow)"/>
+
+  <!-- Left Hemisphere Contour -->
+  <path d="M 285 140 C 210 140, 140 180, 140 260 C 140 310, 160 340, 180 370 C 200 400, 230 430, 260 450 C 275 460, 285 470, 285 500" stroke="url(#neuralStroke)" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.85"/>
+
+  <!-- Right Hemisphere Contour -->
+  <path d="M 315 140 C 390 140, 460 180, 460 260 C 460 310, 440 340, 420 370 C 400 400, 370 430, 340 450 C 325 460, 315 470, 315 500" stroke="url(#neuralStroke)" stroke-width="2" stroke-linecap="round" fill="none" opacity="0.85"/>
+
+  <!-- Longitudinal Fissure (Center Dip) -->
+  <path d="M 300 135 L 300 480" stroke="#ffffff" stroke-width="1.5" stroke-dasharray="4 8" opacity="0.3"/>
+
+  <!-- Gyri & Sulci Waves Left -->
+  <path d="M 180 200 Q 220 220, 260 190 T 285 240 Q 220 260, 170 290 Q 230 310, 280 320 Q 200 360, 240 400" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.4" fill="none"/>
+
+  <!-- Gyri & Sulci Waves Right -->
+  <path d="M 420 200 Q 380 220, 340 190 T 315 240 Q 380 260, 430 290 Q 370 310, 320 320 Q 400 360, 360 400" stroke="#ffffff" stroke-width="1.2" stroke-linecap="round" opacity="0.4" fill="none"/>
+
+  <!-- Cerebellum and Stem -->
+  <path d="M 230 460 Q 300 480, 370 460 Q 340 520, 300 530 Q 260 520, 230 460 Z" stroke="#ffffff" stroke-width="1.2" opacity="0.35" fill="none"/>
+  <path d="M 285 500 L 285 550 Q 300 560, 315 550 L 315 500" stroke="#ffffff" stroke-width="1.5" opacity="0.5"/>
+
+  <!-- Neural Constellation Points -->
+  <g fill="#ffffff">
+    <circle cx="210" cy="230" r="3" opacity="0.9"/>
+    <circle cx="270" cy="200" r="2.5" opacity="0.7"/>
+    <circle cx="160" cy="270" r="2.5" opacity="0.8"/>
+    <circle cx="230" cy="290" r="3" opacity="0.9"/>
+    <circle cx="190" cy="350" r="2" opacity="0.6"/>
+    <circle cx="250" cy="380" r="2.5" opacity="0.7"/>
+    <circle cx="270" cy="430" r="2" opacity="0.6"/>
+
+    <circle cx="390" cy="230" r="3" opacity="0.9"/>
+    <circle cx="330" cy="200" r="2.5" opacity="0.7"/>
+    <circle cx="440" cy="270" r="2.5" opacity="0.8"/>
+    <circle cx="370" cy="290" r="3" opacity="0.9"/>
+    <circle cx="410" cy="350" r="2" opacity="0.6"/>
+    <circle cx="350" cy="380" r="2.5" opacity="0.7"/>
+    <circle cx="330" cy="430" r="2" opacity="0.6"/>
+  </g>
+
+  <!-- Highlight Failure Nodes (Pulsing Red) -->
+  <g filter="url(#glow)">
+    <circle cx="230" cy="290" r="4.5" fill="#ef4444" opacity="0.95"/>
+    <circle cx="390" cy="230" r="4" fill="#ef4444" opacity="0.9"/>
+    <circle cx="350" cy="380" r="4" fill="#ef4444" opacity="0.85"/>
+  </g>
+</svg>

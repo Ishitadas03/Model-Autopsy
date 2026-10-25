@@ -384,3 +384,361 @@ python scripts/experiments/run_e001.py --seed 42
 ```
 Full multi-seed statistical evaluation suite ($R=5$ seeds: `[42, 123, 456, 789, 1011]`) is specified for future research extensions.
 """
+
+
+def generate_multiseed_artifacts(
+    experiment_id: str,
+    output_dir: Path,
+    multi_seed_result: Any,
+    dataset_metadata: Dict[str, Any],
+    model_metadata: Dict[str, Any],
+    protocol_version: str = "1.0.0",
+) -> Dict[str, Path]:
+    """Generate and serialize all artifacts for multi-seed statistical evaluation.
+
+    Generates:
+        - all_seeds_results.csv & all_seeds_results.json
+        - aggregate_results.csv & severity_metrics.csv
+        - aggregate_results.json
+        - manifest.json
+        - report.md
+
+    Args:
+        experiment_id: Experiment ID string (e.g. 'E001').
+        output_dir: Destination directory for multi-seed outputs.
+        multi_seed_result: MultiSeedEvaluationResult instance.
+        dataset_metadata: Dataset metadata dictionary.
+        model_metadata: Model metadata dictionary.
+        protocol_version: Protocol version string.
+
+    Returns:
+        Dictionary mapping artifact name to Path.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    artifacts: Dict[str, Path] = {}
+
+    # 1. all_seeds_results.csv & all_seeds_results.json
+    all_seeds_rows = []
+    for seed, seed_run in multi_seed_result.per_seed_results.items():
+        for rec in seed_run.get("severity_records", []):
+            all_seeds_rows.append({
+                "seed": seed,
+                "severity": rec["severity"],
+                "macro_f1": rec["macro_f1"],
+                "accuracy": rec["accuracy"],
+                "absolute_degradation_pp": rec["absolute_degradation_pp"],
+                "relative_degradation_pct": rec["relative_degradation_pct"],
+                "is_failed": rec["is_failed"],
+                "rel_drop_exceeds_15_pct": rec.get("rel_drop_exceeds_15_pct", False),
+            })
+
+    all_seeds_csv_path = output_dir / "all_seeds_results.csv"
+    with open(all_seeds_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "seed",
+                "severity",
+                "macro_f1",
+                "accuracy",
+                "absolute_degradation_pp",
+                "relative_degradation_pct",
+                "is_failed",
+                "rel_drop_exceeds_15_pct",
+            ],
+        )
+        writer.writeheader()
+        writer.writerows(all_seeds_rows)
+    artifacts["all_seeds_results.csv"] = all_seeds_csv_path
+
+    all_seeds_json_path = output_dir / "all_seeds_results.json"
+    with open(all_seeds_json_path, "w", encoding="utf-8") as f:
+        json.dump(
+            {str(k): v for k, v in multi_seed_result.per_seed_results.items()},
+            f,
+            indent=2,
+        )
+    artifacts["all_seeds_results.json"] = all_seeds_json_path
+
+    # 2. aggregate_results.csv & severity_metrics.csv
+    agg_headers = [
+        "severity",
+        "n_successful_runs",
+        "macro_f1_mean",
+        "macro_f1_std",
+        "macro_f1_sem",
+        "macro_f1_ci_lower",
+        "macro_f1_ci_upper",
+        "accuracy_mean",
+        "accuracy_std",
+        "accuracy_sem",
+        "abs_degradation_pp_mean",
+        "rel_degradation_pct_mean",
+        "failure_count",
+        "failure_proportion",
+        "is_mean_failed",
+    ]
+
+    agg_rows = []
+    for agg in multi_seed_result.severity_aggregates:
+        agg_rows.append({
+            "severity": agg.severity,
+            "n_successful_runs": agg.n_successful_runs,
+            "macro_f1_mean": agg.macro_f1.mean,
+            "macro_f1_std": agg.macro_f1.sample_std,
+            "macro_f1_sem": agg.macro_f1.sem,
+            "macro_f1_ci_lower": agg.macro_f1.ci_lower,
+            "macro_f1_ci_upper": agg.macro_f1.ci_upper,
+            "accuracy_mean": agg.accuracy.mean,
+            "accuracy_std": agg.accuracy.sample_std,
+            "accuracy_sem": agg.accuracy.sem,
+            "abs_degradation_pp_mean": agg.absolute_degradation_pp.mean,
+            "rel_degradation_pct_mean": agg.relative_degradation_pct.mean,
+            "failure_count": agg.failure_count,
+            "failure_proportion": agg.failure_proportion,
+            "is_mean_failed": agg.is_mean_failed,
+        })
+
+    for fname in ["aggregate_results.csv", "severity_metrics.csv"]:
+        csv_path = output_dir / fname
+        with open(csv_path, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(f, fieldnames=agg_headers)
+            writer.writeheader()
+            writer.writerows(agg_rows)
+        artifacts[fname] = csv_path
+
+    # 3. aggregate_results.json
+    agg_json_path = output_dir / "aggregate_results.json"
+    with open(agg_json_path, "w", encoding="utf-8") as f:
+        json.dump(multi_seed_result.to_dict(), f, indent=2)
+    artifacts["aggregate_results.json"] = agg_json_path
+
+    # 4. manifest.json
+    manifest_data = {
+        "experiment_id": experiment_id,
+        "experiment_name": "Multi-Seed Gaussian Noise Robustness Evaluation of Random Forest on Iris",
+        "protocol_version": protocol_version,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "git_commit_hash": get_git_commit_hash(),
+        "environment": get_environment_metadata(),
+        "dataset": dataset_metadata,
+        "model": model_metadata,
+        "noise_definition": {
+            "family": "additive_gaussian_noise",
+            "mathematical_formula": "epsilon_ij ~ Normal(0, (severity * train_std[j])^2)",
+            "dispersion_source": "train_partition_strictly",
+            "dispersion_degrees_of_freedom": "ddof=1",
+            "evaluated_severities": multi_seed_result.severities,
+        },
+        "seeds": {
+            "evaluated_seeds": multi_seed_result.seeds,
+            "n_total_seeds": multi_seed_result.n_total_seeds,
+            "n_successful_seeds": multi_seed_result.n_successful_seeds,
+            "n_failed_seeds": multi_seed_result.n_failed_seeds,
+            "failed_seed_details": multi_seed_result.failed_seed_details,
+        },
+        "statistical_protocol": {
+            "sample_size_R": len(multi_seed_result.seeds),
+            "dispersion_estimator": "sample standard deviation (ddof=1)",
+            "confidence_interval": "Two-sided 95% Student's t-distribution with df=n-1",
+            "t_critical_value": (
+                multi_seed_result.severity_aggregates[0].macro_f1.t_critical
+                if multi_seed_result.severity_aggregates
+                else 2.7764
+            ),
+        },
+        "evaluation_criteria": {
+            "primary_metric": "macro_f1",
+            "secondary_metrics": ["accuracy", "confusion_matrix"],
+            "failure_threshold": multi_seed_result.failure_threshold,
+            "failure_rule": "macro_f1 < failure_threshold (strict less-than)",
+        },
+        "observed_failure_boundary": {
+            "mean_performance_boundary": multi_seed_result.mean_observed_boundary,
+            "earliest_individual_boundary": multi_seed_result.earliest_individual_boundary,
+            "per_seed_boundaries": multi_seed_result.per_seed_boundaries,
+            "boundary_caption": multi_seed_result.boundary_caption,
+        },
+        "artifacts_generated": {k: str(v.name) for k, v in artifacts.items()},
+        "scientific_limitations": [
+            "Benchmark scale: Iris is a 4-feature, 150-instance benchmark; findings do not generalize across high-dimensional non-tabular domains.",
+            "Evaluation discretization: With N_test=30 (10/class), each misclassification changes metric by 3.33 percentage points.",
+            "Noise specificity: Additive isotropic Gaussian noise is a synthetic model and does not reflect structured or adversarial shifts.",
+            "Observational nature: Feature sensitivities reflect empirical variance and must not be interpreted causally.",
+        ],
+    }
+    manifest_path = output_dir / "manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_data, f, indent=2)
+    artifacts["manifest.json"] = manifest_path
+
+    # 5. report.md
+    report_content = generate_multiseed_markdown_report(
+        experiment_id=experiment_id,
+        protocol_version=protocol_version,
+        multi_seed_result=multi_seed_result,
+        dataset_metadata=dataset_metadata,
+        model_metadata=model_metadata,
+    )
+    report_path = output_dir / "report.md"
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
+    artifacts["report.md"] = report_path
+
+    return artifacts
+
+
+def generate_multiseed_markdown_report(
+    experiment_id: str,
+    protocol_version: str,
+    multi_seed_result: Any,
+    dataset_metadata: Dict[str, Any],
+    model_metadata: Dict[str, Any],
+) -> str:
+    """Generate formal scientific report for multi-seed research evaluation."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    base_agg = multi_seed_result.severity_aggregates[0]
+    worst_agg = min(multi_seed_result.severity_aggregates, key=lambda a: a.macro_f1.mean)
+
+    # Statistical Aggregate Table Rows
+    table_rows = []
+    for agg in multi_seed_result.severity_aggregates:
+        s = agg.severity
+        m_f1 = agg.macro_f1.mean
+        s_f1 = agg.macro_f1.sample_std
+        sem_f1 = agg.macro_f1.sem
+        low_ci = agg.macro_f1.ci_lower
+        high_ci = agg.macro_f1.ci_upper
+        m_acc = agg.accuracy.mean
+        d_abs = agg.absolute_degradation_pp.mean
+        fail_str = f"{agg.failure_count}/{agg.n_successful_runs} ({agg.failure_proportion * 100:.1f}%)"
+        status = "**FAIL**" if agg.is_mean_failed else "PASS"
+
+        table_rows.append(
+            f"| `{s:.2f}` | `{m_f1:.4f}` | `±{s_f1:.4f}` | `±{sem_f1:.4f}` | `[{low_ci:.4f}, {high_ci:.4f}]` | "
+            f"`{m_acc:.4f}` | `{d_abs:+.2f} pp` | {fail_str} | {status} |"
+        )
+    table_block = "\n".join(table_rows)
+
+    # Per-Seed Summary Table Rows
+    per_seed_rows = []
+    for seed in multi_seed_result.seeds:
+        run_data = multi_seed_result.per_seed_results[seed]
+        recs = run_data.get("severity_records", [])
+        base_f1 = recs[0]["macro_f1"] if recs else 0.0
+        worst_rec = min(recs, key=lambda r: float(r["macro_f1"])) if recs else {"macro_f1": 0.0, "severity": 0.0}
+        b_val = multi_seed_result.per_seed_boundaries.get(seed)
+        b_str = f"`s* = {b_val:.2f}`" if b_val is not None else "`s* > 0.30` (Unobserved)"
+        per_seed_rows.append(
+            f"| `{seed}` | `{base_f1:.4f}` | `{worst_rec['macro_f1']:.4f}` (at `s={worst_rec['severity']:.2f}`) | {b_str} |"
+        )
+    per_seed_table_block = "\n".join(per_seed_rows)
+
+    mean_b = multi_seed_result.mean_observed_boundary
+    if mean_b is not None:
+        mean_b_str = f"**`s* = {mean_b:.2f}`**"
+    else:
+        mean_b_str = f"**Not observed within tested severity range (`s* > {max(multi_seed_result.severities):.2f}`)**"
+
+    earliest_b = multi_seed_result.earliest_individual_boundary
+    if earliest_b is not None:
+        earliest_b_str = f"`s* = {earliest_b:.2f}`"
+    else:
+        earliest_b_str = "None (No individual seed crossed threshold)"
+
+    return rf"""# Empirical Research Report: {experiment_id} (Multi-Seed Evaluation)
+> **Title:** Multi-Seed Statistical Characterization of Random Forest Robustness Under Additive Gaussian Noise on the Iris Benchmark  
+> **Protocol Version:** {protocol_version} | **Execution Timestamp:** {timestamp}  
+> **Sample Size:** $R = {multi_seed_result.n_successful_seeds}$ Independent PRNG Seeds: `{multi_seed_result.seeds}`  
+> **Repository Context:** Model Autopsy ML Engine  
+
+---
+
+## 1. Executive Summary
+
+- **Primary Research Question:** *"How does Gaussian input noise affect the Macro-F1 performance of a Random Forest classifier on the Iris dataset across repeated independent stochastic initializations?"*
+- **Baseline Performance ($s = 0.00$):**
+  - Mean Macro-F1: `{base_agg.macro_f1.mean:.4f} ± {base_agg.macro_f1.sem:.4f}` ($\text{{SEM}}$), 95% CI: `[{base_agg.macro_f1.ci_lower:.4f}, {base_agg.macro_f1.ci_upper:.4f}]`
+  - Mean Accuracy: `{base_agg.accuracy.mean:.4f} ± {base_agg.accuracy.sem:.4f}` ($\text{{SEM}}$)
+- **Worst-Case Performance ($s = {worst_agg.severity:.2f}$):**
+  - Mean Macro-F1: `{worst_agg.macro_f1.mean:.4f} ± {worst_agg.macro_f1.sem:.4f}` ($\text{{SEM}}$), 95% CI: `[{worst_agg.macro_f1.ci_lower:.4f}, {worst_agg.macro_f1.ci_upper:.4f}]`
+  - Mean Absolute Degradation: `{worst_agg.absolute_degradation_pp.mean:.2f} pp`
+- **Observed Mean Failure Boundary:** {mean_b_str}
+- **Earliest Individual Run Failure Boundary:** {earliest_b_str}
+- **Mandated Reporting Caption:**
+  > *"{multi_seed_result.boundary_caption}"*
+
+---
+
+## 2. Experimental & Statistical Protocol
+
+| Component | Value / Specification |
+|---|---|
+| **Dataset** | Fisher Iris Benchmark ($N = 150$, 4 continuous features, 3 classes) |
+| **Train/Test Partitioning** | Stratified 80/20 split (`split_seed = 42`, Frozen across all seeds) |
+| **Partition Sample Counts** | $N_{{\text{{train}}}} = 120$ (40/class), $N_{{\text{{test}}}} = 30$ (10/class) |
+| **Feature Dispersion ($\sigma_j$)** | Estimated strictly on $X_{{\text{{train}}}}$ partition using sample standard deviation ($ddof = 1$) |
+| **Model Family** | `RandomForestClassifier` (100 trees, unconstrained depth, Gini criterion) |
+| **Evaluated PRNG Seeds ($R=5$)** | `{multi_seed_result.seeds}` |
+| **Noise Formulation** | $\varepsilon_{{ij}} \sim \mathcal{{N}}(0, (s \cdot \sigma_j)^2)$, where $s \in [0.00, 0.30]$ |
+| **Statistical Estimators** | Sample mean $\bar{{M}}(s)$, sample standard deviation $S_M(s)$ ($ddof=1$), $\text{{SEM}} = S_M / \sqrt{{R}}$ |
+| **Confidence Interval** | Two-sided 95% Student's $t$-distribution with $R - 1 = {multi_seed_result.n_successful_seeds - 1}$ degrees of freedom ($t_{{0.025, 4}} = {base_agg.macro_f1.t_critical:.4f}$) |
+| **Reliability Criterion** | Strict failure if $\text{{Macro-F1}} < {multi_seed_result.failure_threshold:.2f}$ |
+
+---
+
+## 3. Multi-Seed Statistical Robustness Table
+
+| Severity ($s$) | Mean Macro-F1 | Sample Std ($S_M$) | SEM | 95% Student's t CI | Mean Accuracy | Abs Drop (pp) | Run Failures | Status |
+|---|---|---|---|---|---|---|---|---|
+{table_block}
+
+*Notes: Sample standard deviation $S_M$ is computed strictly with $ddof=1$. Confidence intervals use Student's $t$-distribution with $\text{{df}} = 4$ ($t_{{0.025, 4}} = {base_agg.macro_f1.t_critical:.4f}$). Abs Drop indicates mean absolute degradation in percentage points.*
+
+---
+
+## 4. Per-Seed Performance & Boundary Breakdown
+
+| Seed ($r$) | Baseline Macro-F1 ($s=0$) | Worst Macro-F1 Observed | Observed Failure Boundary ($s^*$) |
+|---|---|---|---|
+{per_seed_table_block}
+
+---
+
+## 5. Failure Boundary Characterization
+
+- **Mean Performance Failure Boundary:** {mean_b_str}
+- **Individual-Run Boundary Dispersion:** {earliest_b_str}
+- **Methodological Distinction:**
+  The aggregate failure boundary evaluates whether the *sample mean* $\bar{{M}}(s)$ crosses the reliability threshold ($0.80$), whereas per-seed boundaries track whether any *individual stochastic realization* crossed the boundary.
+- **Mandated Reporting Caption:**
+  > *"{multi_seed_result.boundary_caption}"*
+
+---
+
+## 6. Monotonicity & Trend Analysis
+
+- **Strict Monotonic Decay Across All Severities:** `{'Yes' if multi_seed_result.monotonicity_summary['is_strictly_monotonic'] else 'No'}`
+- **Diagnostic Finding:**
+  {multi_seed_result.monotonicity_summary['note']}
+
+---
+
+## 7. Scientific Limitations & Threats to Validity
+
+1. **Small Sample Benchmark:** The Iris dataset contains only 150 instances and 4 features. High robustness observed on Iris cannot be generalized to complex vision, speech, or high-dimensional tabular data.
+2. **Discretization Uncertainty:** In a 30-sample test partition, a single classification shift produces a $3.33\,\text{{pp}}$ metric change.
+3. **Synthetic Corruption:** Isotropic additive Gaussian noise is a continuous perturbation model that does not capture structured sensor outages, distribution drift, or adversarial perturbations.
+4. **Non-Causal Interpretability:** Feature rankings and metric shifts represent observational sensitivity under the tested perturbation protocol, not causal mechanisms.
+
+---
+
+## 8. Reproducibility Statement
+
+To deterministically reproduce this 5-seed research evaluation:
+```bash
+python scripts/experiments/run_e001.py --multi-seed
+```
+"""
+

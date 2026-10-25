@@ -36,6 +36,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@
 import { RobustnessCurve } from '@/components/results/RobustnessCurve';
 import { BoundarySimulator } from '@/components/results/BoundarySimulator';
 import { FeatureVulnerability } from '@/components/results/FeatureVulnerability';
+import { E003Workspace } from '@/components/results/E003Workspace';
 
 function ResultsDashboardContent() {
   const params = useParams();
@@ -128,6 +129,14 @@ function ResultsDashboardContent() {
       setIsRerunning(false);
     }
   };
+
+  if (experimentId.toUpperCase() === 'E003') {
+    return (
+      <AppShell showSidebar={false}>
+        <E003Workspace />
+      </AppShell>
+    );
+  }
 
   if (loading) {
     return (

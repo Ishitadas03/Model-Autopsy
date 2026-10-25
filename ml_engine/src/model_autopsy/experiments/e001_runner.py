@@ -213,3 +213,155 @@ def run_e001_experiment(
         "feature_vulnerabilities": feature_vulnerabilities,
         "artifacts": {k: str(v) for k, v in artifacts.items()},
     }
+
+
+def run_e001_multiseed_experiment(
+    config_path: Optional[Path] = None,
+    seeds: Optional[List[int]] = None,
+    output_dir: Optional[Path] = None,
+) -> Dict[str, Any]:
+    """Execute the multi-seed research evaluation suite for E001 across independent seeds.
+
+    Protocol:
+        1. Evaluate across R = 5 independent PRNG seeds: [42, 123, 456, 789, 1011].
+        2. Keep the train/test split frozen (split_seed=42) across all runs.
+        3. Estimate train dispersion exclusively on each run's training partition.
+        4. Calculate sample mean, sample standard deviation (ddof=1), SEM, and
+           two-sided 95% Student's t confidence intervals (df=4, t_crit=2.7764).
+        5. Generate per-seed CSV/JSON, aggregate CSV/JSON, multi-seed plot,
+           reproducibility manifest, and formal markdown research report.
+
+    Args:
+        config_path: Path to YAML experiment configuration.
+        seeds: List of seeds (default: [42, 123, 456, 789, 1011]).
+        output_dir: Destination directory for multi-seed outputs
+            (default: artifacts/experiments/E001_multi_seed).
+
+    Returns:
+        Dictionary containing execution summary, aggregate statistical results, and artifact paths.
+    """
+    from model_autopsy.analysis.statistical import aggregate_multi_seed_results
+    from model_autopsy.reporting.artifacts import generate_multiseed_artifacts
+    from model_autopsy.visualization.curve_plotter import plot_multiseed_robustness_curve
+
+    # 1. Load config
+    config: Dict[str, Any] = {}
+    if config_path is not None and Path(config_path).exists():
+        with open(config_path, "r", encoding="utf-8") as f:
+            config = yaml.safe_load(f)
+
+    exp_cfg = config.get("experiment", {})
+    experiment_id = exp_cfg.get("id", "E001")
+    protocol_version = exp_cfg.get("protocol_version", "1.0.0")
+
+    model_cfg = config.get("model", {})
+    if seeds is None:
+        seeds = model_cfg.get("research_seeds", [42, 123, 456, 789, 1011])
+
+    severities = config.get("stress_test", {}).get(
+        "severities", [0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
+    )
+    failure_threshold = float(config.get("evaluation", {}).get("failure_threshold", 0.80))
+
+    if output_dir is None:
+        target_out = Path("artifacts/experiments/E001_multi_seed")
+    else:
+        target_out = Path(output_dir)
+
+    target_out.mkdir(parents=True, exist_ok=True)
+    seeds_dir = target_out / "seeds"
+    seeds_dir.mkdir(parents=True, exist_ok=True)
+
+    # 2. Execute each seed
+    per_seed_runs: Dict[int, Dict[str, Any]] = {}
+    failed_seeds: List[Dict[str, Any]] = []
+
+    for s_val in seeds:
+        seed_int = int(s_val)
+        sub_dir = seeds_dir / f"seed_{seed_int}"
+        try:
+            run_res = run_e001_experiment(
+                config_path=config_path,
+                seed=seed_int,
+                output_dir=sub_dir,
+            )
+            per_seed_runs[seed_int] = run_res
+        except Exception as exc:
+            failed_seeds.append({
+                "seed": seed_int,
+                "error": str(exc),
+                "error_type": exc.__class__.__name__,
+            })
+
+    if not per_seed_runs:
+        raise RuntimeError(f"All {len(seeds)} seed runs failed unexpectedly. Details: {failed_seeds}")
+
+    # 3. Statistical Aggregation
+    multi_seed_result = aggregate_multi_seed_results(
+        per_seed_runs=per_seed_runs,
+        severities=severities,
+        failure_threshold=failure_threshold,
+        experiment_id=experiment_id,
+        failed_seeds=failed_seeds,
+    )
+
+    # Extract dataset metadata from first successful run
+    first_run = next(iter(per_seed_runs.values()))
+    # Retrieve dataset split bundle for metadata
+    dataset_bundle = load_and_validate_iris(split_seed=42)
+    dataset_metadata = {
+        "name": "iris",
+        "n_instances": 150,
+        "n_train": len(dataset_bundle.X_train),
+        "n_test": len(dataset_bundle.X_test),
+        "feature_names": dataset_bundle.feature_names,
+        "target_names": dataset_bundle.target_names,
+        "dataset_hash": dataset_bundle.dataset_hash,
+        "feature_train_std": [round(float(v), 5) for v in dataset_bundle.train_std],
+        "split_seed": 42,
+    }
+
+    model_metadata = {
+        "adapter": "RandomForestAdapter",
+        "class_name": "RandomForestClassifier",
+        "n_estimators": 100,
+        "max_depth": None,
+        "criterion": "gini",
+        "evaluated_seeds": seeds,
+    }
+
+    # 4. Multi-Seed Visualization Plot
+    plot_path = target_out / "robustness_curve_multiseed.png"
+    plot_multiseed_robustness_curve(
+        severity_aggregates=multi_seed_result.severity_aggregates,
+        output_path=plot_path,
+        per_seed_runs=per_seed_runs,
+        failure_threshold=failure_threshold,
+        experiment_id=experiment_id,
+        model_name="RandomForest (R=5 Seeds)",
+        dataset_name="Fisher Iris Dataset",
+    )
+
+    # 5. Multi-Seed Artifact Generation
+    artifacts = generate_multiseed_artifacts(
+        experiment_id=experiment_id,
+        output_dir=target_out,
+        multi_seed_result=multi_seed_result,
+        dataset_metadata=dataset_metadata,
+        model_metadata=model_metadata,
+        protocol_version=protocol_version,
+    )
+    artifacts["robustness_curve_multiseed.png"] = plot_path
+
+    status_str = "success" if not failed_seeds else "partial_success"
+    return {
+        "status": status_str,
+        "experiment_id": experiment_id,
+        "seeds": seeds,
+        "n_successful_seeds": len(per_seed_runs),
+        "n_failed_seeds": len(failed_seeds),
+        "failed_seed_details": failed_seeds,
+        "multi_seed_result": multi_seed_result,
+        "artifacts": {k: str(v) for k, v in artifacts.items()},
+    }
+

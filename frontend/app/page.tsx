@@ -267,7 +267,7 @@ export default function LandingPage() {
                       <div className="space-y-4">
                         <div className="flex items-center justify-between">
                           <span className="font-mono text-xs font-bold text-sky-400/80 px-2 py-0.5 rounded bg-sky-500/10 border border-sky-500/20">
-                            {item.step} // {item.phase}
+                            {`${item.step} // ${item.phase}`}
                           </span>
                           <div className="p-2.5 rounded-xl bg-surface-2 border border-white/10 text-white/80 group-hover:border-sky-400/40 group-hover:bg-sky-500/15 group-hover:text-sky-300 transition-all duration-200 shadow-sm">
                             <Icon className="w-4 h-4" />

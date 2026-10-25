@@ -19,7 +19,7 @@ if str(ML_ENGINE_SRC) not in sys.path:
     sys.path.insert(0, str(ML_ENGINE_SRC))
 
 try:
-    from model_autopsy.experiments.e001_runner import run_e001_experiment
+    from model_autopsy.experiments.e001_runner import run_e001_experiment, run_e001_multiseed_experiment
 except ImportError as exc:
     print(f"[FATAL ERROR] Failed to import model_autopsy from {ML_ENGINE_SRC}: {exc}", file=sys.stderr)
     sys.exit(1)
@@ -44,7 +44,7 @@ def main() -> int:
     parser.add_argument(
         "--output-dir",
         type=Path,
-        default=REPO_ROOT / "artifacts" / "experiments" / "E001",
+        default=None,
         help="Destination directory for output artifacts.",
     )
     parser.add_argument(
@@ -55,34 +55,84 @@ def main() -> int:
 
     args = parser.parse_args()
 
-    print("=" * 76)
+    print("=" * 78)
     print("MODEL AUTOPSY — EXPERIMENT E001 RUNNER")
     print("Gaussian Noise Robustness Evaluation of Random Forest on Iris")
-    print("=" * 76)
+    print("=" * 78)
 
     if args.multi_seed:
-        print("[INFO] Multi-seed research suite mode selected: seeds [42, 123, 456, 789, 1011]")
-        research_seeds = [42, 123, 456, 789, 1011]
-        overall_results = {}
-        for r_seed in research_seeds:
-            print(f"\n---> Executing research seed {r_seed}...")
-            sub_out = args.output_dir / f"seed_{r_seed}"
-            res = run_e001_experiment(config_path=args.config, seed=r_seed, output_dir=sub_out)
-            overall_results[r_seed] = res
-            print(f"     Baseline Macro-F1: {res['baseline_macro_f1']:.4f}")
-            print(f"     Failure Boundary: {res['failure_boundary']['summary_message']}")
-        print("\n[SUCCESS] Completed multi-seed research evaluation suite.")
-        return 0
+        out_dir = args.output_dir or (REPO_ROOT / "artifacts" / "experiments" / "E001_multi_seed")
+        print("[MODE] Multi-Seed Research Evaluation Suite (R=5 Seeds)")
+        print(f"[CONFIG] Protocol configuration: {args.config}")
+        print(f"[DESTINATION] Artifacts directory: {out_dir}")
 
+        try:
+            res = run_e001_multiseed_experiment(
+                config_path=args.config,
+                output_dir=out_dir,
+            )
+            m_res = res["multi_seed_result"]
+
+            print("\n" + "-" * 78)
+            print("MULTI-SEED STATISTICAL AGGREGATE TABLE (R=5 Seeds)")
+            print("-" * 78)
+            print(
+                f"{'Severity':<9} | {'Mean Macro-F1':<13} | {'SEM':<9} | {'95% Student t CI':<19} | "
+                f"{'Mean Acc':<9} | {'Failures':<8} | {'Status':<6}"
+            )
+            print("-" * 78)
+            for agg in m_res.severity_aggregates:
+                s = agg.severity
+                f1_m = agg.macro_f1.mean
+                sem = agg.macro_f1.sem
+                ci_str = f"[{agg.macro_f1.ci_lower:.3f}, {agg.macro_f1.ci_upper:.3f}]"
+                acc_m = agg.accuracy.mean
+                fail_s = f"{agg.failure_count}/{agg.n_successful_runs}"
+                stat = "FAIL" if agg.is_mean_failed else "PASS"
+                print(
+                    f"{s:<9.2f} | {f1_m:<13.4f} | ±{sem:<8.4f} | {ci_str:<19} | "
+                    f"{acc_m:<9.4f} | {fail_s:<8} | {stat:<6}"
+                )
+
+            print("\n" + "-" * 78)
+            print("PER-SEED FAILURE BOUNDARIES BREAKDOWN")
+            print("-" * 78)
+            for s_val, b_val in m_res.per_seed_boundaries.items():
+                b_s = f"s* = {b_val:.2f}" if b_val is not None else "s* > 0.30 (Not observed)"
+                print(f"  • Seed {s_val:<5} -> Observed Boundary: {b_s}")
+
+            mean_b = m_res.mean_observed_boundary
+            mb_str = f"s* = {mean_b:.2f}" if mean_b is not None else "Not observed (s* > 0.30)"
+            print(f"\nMean Performance Failure Boundary: {mb_str}")
+            earliest_b = m_res.earliest_individual_boundary
+            eb_str = f"s* = {earliest_b:.2f}" if earliest_b is not None else "None"
+            print(f"Earliest Individual Run Boundary:  {eb_str}")
+            print(f"Mandated Caption:                  \"{m_res.boundary_caption}\"")
+
+            print("\n" + "-" * 78)
+            print("GENERATED MULTI-SEED ARTIFACTS")
+            print("-" * 78)
+            for name, path in res["artifacts"].items():
+                print(f"  • {name:<30} -> {path}")
+
+            print("\n[SUCCESS] Multi-seed research evaluation executed and verified successfully.")
+            return 0
+        except Exception as exc:
+            print(f"\n[FATAL ERROR] Multi-seed evaluation failed: {exc}", file=sys.stderr)
+            import traceback
+            traceback.print_exc()
+            return 1
+
+    out_dir = args.output_dir or (REPO_ROOT / "artifacts" / "experiments" / "E001")
     print(f"[CONFIG] Loading protocol configuration from: {args.config}")
     print(f"[SETUP] Execution seed: {args.seed} (Development Validation Run)")
-    print(f"[SETUP] Artifacts destination: {args.output_dir}")
+    print(f"[SETUP] Artifacts destination: {out_dir}")
 
     try:
         result = run_e001_experiment(
             config_path=args.config,
             seed=args.seed,
-            output_dir=args.output_dir,
+            output_dir=out_dir,
         )
 
         print("\n" + "-" * 76)

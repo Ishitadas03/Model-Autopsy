@@ -477,3 +477,156 @@ def plot_e002_multicorruption_comparison(
     return output_path
 
 
+def plot_e003_cross_model_comparison(
+    results_by_model: Dict[str, Dict[str, Any]],
+    output_path: Path,
+    failure_threshold: float = 0.80,
+    dataset_name: str = "Iris Flower Dataset",
+    experiment_id: str = "E003",
+) -> Path:
+    """Generate publication-grade 3-panel cross-model robustness comparison figure.
+
+    Visualizes degradation trajectories and 95% Student's t confidence intervals for:
+      - Random Forest (Bagged Orthogonal Trees)
+      - Logistic Regression (Pipeline with Training-Fitted StandardScaler)
+      - Gradient Boosted Decision Trees (Additive Sequential Ensembles)
+    Across three distinct corruption panels:
+      Panel 1: Additive Gaussian Noise
+      Panel 2: MCAR Missingness (Mean Imputed)
+      Panel 3: Impulsive Outlier Contamination (5σ)
+
+    Args:
+        results_by_model: Nested dictionary mapping model_id to corruption_id to MultiSeedEvaluationResult.
+        output_path: Target PNG destination.
+        failure_threshold: Primary failure threshold (default: 0.80).
+        dataset_name: Dataset name string.
+        experiment_id: Experiment ID string ('E003').
+
+    Returns:
+        Path to generated PNG file.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, axes = plt.subplots(1, 3, figsize=(19, 6.2), facecolor="#0B0F19", sharey=True)
+
+    corruptions = [
+        ("gaussian_noise", "Additive Gaussian Noise", "Continuous Isotropic Jitter"),
+        ("feature_missingness_mcar", "MCAR Missingness", "Cell Dropout + Training-Mean Imputation"),
+        ("feature_outliers", "Impulsive Outliers (5σ)", "Sparse Stochastic Extreme Replacement"),
+    ]
+
+    model_styles = {
+        "random_forest": {"color": "#00E5FF", "marker": "o", "label": "Random Forest"},
+        "logistic_regression": {"color": "#FFB300", "marker": "s", "label": "Logistic Regression (Scaled)"},
+        "gradient_boosting": {"color": "#E040FB", "marker": "^", "label": "Gradient Boosting"},
+    }
+
+    for ax_idx, (corr_id, corr_title, corr_subtitle) in enumerate(corruptions):
+        ax = axes[ax_idx]
+        ax.set_facecolor("#111827")
+        ax.grid(True, linestyle="--", alpha=0.25, color="#475569", zorder=1)
+
+        # Plot each model for this corruption
+        for model_id, style in model_styles.items():
+            if model_id not in results_by_model or corr_id not in results_by_model[model_id]:
+                continue
+
+            res = results_by_model[model_id][corr_id]
+            aggregates = getattr(res, "severity_aggregates", [])
+            if not aggregates:
+                continue
+
+            severities = [float(a.severity) for a in aggregates]
+            means = [float(a.macro_f1.mean) for a in aggregates]
+            ci_lowers = [float(a.macro_f1.ci_lower) for a in aggregates]
+            ci_uppers = [float(a.macro_f1.ci_upper) for a in aggregates]
+
+            # Shaded 95% CI band
+            ax.fill_between(
+                severities,
+                ci_lowers,
+                ci_uppers,
+                color=style["color"],
+                alpha=0.15,
+                zorder=3,
+            )
+
+            # Mean trajectory line
+            ax.plot(
+                severities,
+                means,
+                color=style["color"],
+                marker=style["marker"],
+                markersize=6,
+                linewidth=2.2,
+                zorder=4,
+                label=f"{style['label']}",
+            )
+
+        # Failure threshold line & shaded regime
+        ax.axhspan(0.0, failure_threshold, facecolor="#FF4D2D", alpha=0.10, zorder=2)
+        ax.axhline(
+            y=failure_threshold,
+            color="#FF4D2D",
+            linestyle="--",
+            linewidth=1.4,
+            alpha=0.9,
+            zorder=2,
+            label=f"Failure Cutoff ({failure_threshold:.2f})",
+        )
+
+        ax.set_xlim(-0.015, 0.315)
+        ax.set_ylim(0.45, 1.05)
+        ax.set_xlabel("Nominal Severity ($s$)", fontsize=10.5, fontweight="semibold", color="#F1F5F9", labelpad=8)
+        if ax_idx == 0:
+            ax.set_ylabel("Macro-F1 Score", fontsize=11, fontweight="semibold", color="#F1F5F9", labelpad=8)
+
+        ax.set_title(
+            f"{corr_title}\n({corr_subtitle})",
+            fontsize=11,
+            fontweight="bold",
+            color="#F8FAFC",
+            pad=10,
+        )
+
+        ax.tick_params(colors="#94A3B8", labelsize=9)
+        for spine in ax.spines.values():
+            spine.set_color("#334155")
+            spine.set_linewidth(0.8)
+
+        legend = ax.legend(
+            loc="lower left",
+            facecolor="#111318",
+            edgecolor="#334155",
+            fontsize=8.0,
+            labelcolor="#E2E8F0",
+        )
+        legend.get_frame().set_alpha(0.92)
+
+    fig.suptitle(
+        f"Cross-Model Robustness Comparison Across Corruptions (RQ5: R=5 Seeds, 95% Student's t CI) — {experiment_id}\n"
+        f"Dataset: {dataset_name} | Models: Random Forest, Logistic Regression (Pipeline Scaled), Gradient Boosting",
+        fontsize=12.5,
+        fontweight="bold",
+        color="#F8FAFC",
+        y=0.98,
+    )
+
+    fig.text(
+        0.5,
+        0.015,
+        "Observed failure boundary under the specified experimental configuration. Empirical sensitivity — not a causal explanation.",
+        ha="center",
+        fontsize=8.5,
+        fontstyle="italic",
+        color="#64748B",
+    )
+
+    plt.tight_layout(rect=[0, 0.04, 1, 0.92])
+    plt.savefig(output_path, dpi=300, facecolor=fig.get_facecolor(), edgecolor="none")
+    plt.close(fig)
+
+    return output_path
+
+

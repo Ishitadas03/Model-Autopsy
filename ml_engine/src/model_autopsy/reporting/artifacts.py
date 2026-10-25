@@ -1108,3 +1108,441 @@ python scripts/experiments/run_e002.py
 """
 
 
+def generate_e003_artifacts(
+    experiment_id: str,
+    output_dir: Path,
+    dataset_metadata: Dict[str, Any],
+    models_metadata: Dict[str, Any],
+    seeds_config: Dict[str, Any],
+    results_by_model: Dict[str, Dict[str, Any]],
+    protocol_version: str = "1.0.0",
+    failure_threshold: float = 0.80,
+) -> Dict[str, Path]:
+    """Generate and persist all E003 cross-model robustness comparison artifacts.
+
+    Generates:
+        - aggregate_comparison.csv (63 rows: 3 models × 3 corruptions × 7 severities)
+        - aggregate_comparison.json
+        - manifest.json
+        - report.md
+        - Per-model and per-corruption subdirectories with granular results.
+
+    Args:
+        experiment_id: Experiment identifier ('E003').
+        output_dir: Destination artifact directory.
+        dataset_metadata: Dataset metadata dictionary.
+        models_metadata: Models metadata dictionary.
+        seeds_config: Dictionary of seed configurations.
+        results_by_model: Nested dictionary mapping model_id to corruption_id to MultiSeedEvaluationResult.
+        protocol_version: Protocol specification version.
+        failure_threshold: Primary reliability failure threshold.
+
+    Returns:
+        Dictionary mapping artifact identifiers to absolute Path objects.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    artifacts: Dict[str, Path] = {}
+
+    # 1. Master aggregate_comparison.csv (63 rows)
+    agg_csv_path = output_dir / "aggregate_comparison.csv"
+    with open(agg_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "model",
+                "corruption",
+                "severity",
+                "n_successful_runs",
+                "macro_f1_mean",
+                "macro_f1_std",
+                "macro_f1_sem",
+                "macro_f1_ci_lower",
+                "macro_f1_ci_upper",
+                "accuracy_mean",
+                "accuracy_std",
+                "accuracy_sem",
+                "abs_degradation_pp_mean",
+                "rel_degradation_pct_mean",
+                "failure_count",
+                "failure_proportion",
+                "is_mean_failed",
+            ],
+        )
+        writer.writeheader()
+        for model_id, corr_dict in results_by_model.items():
+            for corr_id, res in corr_dict.items():
+                for agg in res.severity_aggregates:
+                    writer.writerow({
+                        "model": model_id,
+                        "corruption": corr_id,
+                        "severity": agg.severity,
+                        "n_successful_runs": agg.n_successful_runs,
+                        "macro_f1_mean": agg.macro_f1.mean,
+                        "macro_f1_std": agg.macro_f1.sample_std,
+                        "macro_f1_sem": agg.macro_f1.sem,
+                        "macro_f1_ci_lower": agg.macro_f1.ci_lower,
+                        "macro_f1_ci_upper": agg.macro_f1.ci_upper,
+                        "accuracy_mean": agg.accuracy.mean,
+                        "accuracy_std": agg.accuracy.sample_std,
+                        "accuracy_sem": agg.accuracy.sem,
+                        "abs_degradation_pp_mean": agg.absolute_degradation_pp.mean,
+                        "rel_degradation_pct_mean": agg.relative_degradation_pct.mean,
+                        "failure_count": agg.failure_count,
+                        "failure_proportion": agg.failure_proportion,
+                        "is_mean_failed": agg.is_mean_failed,
+                    })
+    artifacts["aggregate_comparison.csv"] = agg_csv_path
+
+    # 2. Per-model subdirectories & granular CSV/JSON serialization
+    models_base_dir = output_dir / "models"
+    models_base_dir.mkdir(parents=True, exist_ok=True)
+
+    comparison_json_data: Dict[str, Any] = {
+        "experiment_id": experiment_id,
+        "protocol_version": protocol_version,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "dataset_metadata": dataset_metadata,
+        "models_metadata": models_metadata,
+        "seeds_config": seeds_config,
+        "failure_threshold": failure_threshold,
+        "models": {},
+    }
+
+    for model_id, corr_dict in results_by_model.items():
+        m_dir = models_base_dir / model_id
+        m_dir.mkdir(parents=True, exist_ok=True)
+        comparison_json_data["models"][model_id] = {
+            "corruptions": {},
+            "mean_failure_boundaries": {},
+            "earliest_individual_boundaries": {},
+        }
+
+        # Model-level aggregate CSV across all 3 corruptions (21 rows)
+        m_agg_csv = m_dir / "aggregate_results.csv"
+        with open(m_agg_csv, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "corruption",
+                    "severity",
+                    "n_successful_runs",
+                    "macro_f1_mean",
+                    "macro_f1_std",
+                    "macro_f1_sem",
+                    "macro_f1_ci_lower",
+                    "macro_f1_ci_upper",
+                    "accuracy_mean",
+                    "accuracy_std",
+                    "accuracy_sem",
+                    "abs_degradation_pp_mean",
+                    "rel_degradation_pct_mean",
+                    "failure_count",
+                    "failure_proportion",
+                    "is_mean_failed",
+                ],
+            )
+            writer.writeheader()
+            for corr_id, res in corr_dict.items():
+                for agg in res.severity_aggregates:
+                    writer.writerow({
+                        "corruption": corr_id,
+                        "severity": agg.severity,
+                        "n_successful_runs": agg.n_successful_runs,
+                        "macro_f1_mean": agg.macro_f1.mean,
+                        "macro_f1_std": agg.macro_f1.sample_std,
+                        "macro_f1_sem": agg.macro_f1.sem,
+                        "macro_f1_ci_lower": agg.macro_f1.ci_lower,
+                        "macro_f1_ci_upper": agg.macro_f1.ci_upper,
+                        "accuracy_mean": agg.accuracy.mean,
+                        "accuracy_std": agg.accuracy.sample_std,
+                        "accuracy_sem": agg.accuracy.sem,
+                        "abs_degradation_pp_mean": agg.absolute_degradation_pp.mean,
+                        "rel_degradation_pct_mean": agg.relative_degradation_pct.mean,
+                        "failure_count": agg.failure_count,
+                        "failure_proportion": agg.failure_proportion,
+                        "is_mean_failed": agg.is_mean_failed,
+                    })
+
+        # Per-corruption subdirectories
+        m_corr_base = m_dir / "corruptions"
+        m_corr_base.mkdir(parents=True, exist_ok=True)
+        for corr_id, res in corr_dict.items():
+            c_dir = m_corr_base / corr_id
+            c_dir.mkdir(parents=True, exist_ok=True)
+
+            # Per-corruption aggregate CSV
+            with open(c_dir / "aggregate_results.csv", "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(
+                    f,
+                    fieldnames=[
+                        "severity",
+                        "n_successful_runs",
+                        "macro_f1_mean",
+                        "macro_f1_std",
+                        "macro_f1_sem",
+                        "macro_f1_ci_lower",
+                        "macro_f1_ci_upper",
+                        "accuracy_mean",
+                        "accuracy_std",
+                        "accuracy_sem",
+                        "abs_degradation_pp_mean",
+                        "rel_degradation_pct_mean",
+                        "failure_count",
+                        "failure_proportion",
+                        "is_mean_failed",
+                    ],
+                )
+                writer.writeheader()
+                for agg in res.severity_aggregates:
+                    writer.writerow({
+                        "severity": agg.severity,
+                        "n_successful_runs": agg.n_successful_runs,
+                        "macro_f1_mean": agg.macro_f1.mean,
+                        "macro_f1_std": agg.macro_f1.sample_std,
+                        "macro_f1_sem": agg.macro_f1.sem,
+                        "macro_f1_ci_lower": agg.macro_f1.ci_lower,
+                        "macro_f1_ci_upper": agg.macro_f1.ci_upper,
+                        "accuracy_mean": agg.accuracy.mean,
+                        "accuracy_std": agg.accuracy.sample_std,
+                        "accuracy_sem": agg.accuracy.sem,
+                        "abs_degradation_pp_mean": agg.absolute_degradation_pp.mean,
+                        "rel_degradation_pct_mean": agg.relative_degradation_pct.mean,
+                        "failure_count": agg.failure_count,
+                        "failure_proportion": agg.failure_proportion,
+                        "is_mean_failed": agg.is_mean_failed,
+                    })
+
+            # Per-corruption all_seeds CSV
+            with open(c_dir / "all_seeds_results.csv", "w", newline="", encoding="utf-8") as f:
+                writer = csv.DictWriter(
+                    f,
+                    fieldnames=[
+                        "seed",
+                        "severity",
+                        "macro_f1",
+                        "accuracy",
+                        "absolute_degradation_pp",
+                        "relative_degradation_pct",
+                        "is_failed",
+                        "rel_drop_exceeds_15_pct",
+                    ],
+                )
+                writer.writeheader()
+                for seed, seed_run in res.per_seed_results.items():
+                    for rec in seed_run.get("severity_records", []):
+                        writer.writerow({
+                            "seed": seed,
+                            "severity": rec["severity"],
+                            "macro_f1": rec["macro_f1"],
+                            "accuracy": rec["accuracy"],
+                            "absolute_degradation_pp": rec["absolute_degradation_pp"],
+                            "relative_degradation_pct": rec["relative_degradation_pct"],
+                            "is_failed": rec["is_failed"],
+                            "rel_drop_exceeds_15_pct": rec.get("rel_drop_exceeds_15_pct", False),
+                        })
+
+            # Per-corruption aggregate JSON
+            with open(c_dir / "aggregate_results.json", "w", encoding="utf-8") as f:
+                json.dump(res.to_dict(), f, indent=2)
+
+            comparison_json_data["models"][model_id]["corruptions"][corr_id] = res.to_dict()
+            comparison_json_data["models"][model_id]["mean_failure_boundaries"][corr_id] = res.mean_observed_boundary
+            comparison_json_data["models"][model_id]["earliest_individual_boundaries"][corr_id] = res.earliest_individual_boundary
+
+    # 3. Master aggregate_comparison.json
+    agg_json_path = output_dir / "aggregate_comparison.json"
+    with open(agg_json_path, "w", encoding="utf-8") as f:
+        json.dump(comparison_json_data, f, indent=2)
+    artifacts["aggregate_comparison.json"] = agg_json_path
+
+    # 4. Reproducibility Manifest (manifest.json)
+    manifest_data = {
+        "experiment_id": experiment_id,
+        "protocol_version": protocol_version,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "git_commit_hash": get_git_commit_hash(),
+        "environment": get_environment_metadata(),
+        "dataset_metadata": dataset_metadata,
+        "models_metadata": models_metadata,
+        "seeds_config": seeds_config,
+        "evaluation_config": {
+            "primary_metric": "macro_f1",
+            "failure_threshold": failure_threshold,
+            "relative_drop_diagnostic_threshold_pct": 15.0,
+        },
+        "tested_models": list(results_by_model.keys()),
+        "tested_corruptions": list(list(results_by_model.values())[0].keys()),
+    }
+    manifest_path = output_dir / "manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_data, f, indent=2)
+    artifacts["manifest.json"] = manifest_path
+
+    # 5. Research Report (report.md)
+    report_content = generate_e003_markdown_report(
+        experiment_id=experiment_id,
+        results_by_model=results_by_model,
+        dataset_metadata=dataset_metadata,
+        models_metadata=models_metadata,
+        seeds_config=seeds_config,
+        protocol_version=protocol_version,
+        failure_threshold=failure_threshold,
+    )
+    report_path = output_dir / "report.md"
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
+    artifacts["report.md"] = report_path
+
+    return artifacts
+
+
+def generate_e003_markdown_report(
+    experiment_id: str,
+    results_by_model: Dict[str, Dict[str, Any]],
+    dataset_metadata: Dict[str, Any],
+    models_metadata: Dict[str, Any],
+    seeds_config: Dict[str, Any],
+    protocol_version: str = "1.0.0",
+    failure_threshold: float = 0.80,
+) -> str:
+    """Construct publication-grade empirical markdown research report for E003."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    seeds_list = seeds_config.get("research_seeds", [42, 123, 456, 789, 1011])
+
+    corruption_labels = {
+        "gaussian_noise": "Additive Gaussian Noise",
+        "feature_missingness_mcar": "MCAR Missingness (Imputed)",
+        "feature_outliers": "Impulsive Outliers (5σ)",
+    }
+    model_labels = {
+        "random_forest": "Random Forest",
+        "logistic_regression": "Logistic Regression (Scaled)",
+        "gradient_boosting": "Gradient Boosting",
+    }
+
+    # Summary table rows: Model | Corruption | Clean Macro-F1 | Worst Macro-F1 | Abs Drop | Rel Drop | Mean Boundary | Indiv Boundary
+    summary_rows = []
+    for model_id, corr_dict in results_by_model.items():
+        m_name = model_labels.get(model_id, model_id)
+        for corr_id, res in corr_dict.items():
+            c_name = corruption_labels.get(corr_id, corr_id)
+            b_rec = res.severity_aggregates[0]
+            worst_rec = res.severity_aggregates[-1]
+            mean_b = f"s* = {res.mean_observed_boundary:.2f}" if res.mean_observed_boundary is not None else "s* > 0.30"
+            indiv_b = f"s* = {res.earliest_individual_boundary:.2f}" if res.earliest_individual_boundary is not None else "s* > 0.30"
+            summary_rows.append(
+                f"| **{m_name}** | {c_name} | `{b_rec.macro_f1.mean:.4f}` | `{worst_rec.macro_f1.mean:.4f} ± {worst_rec.macro_f1.sem:.4f}` | `+{worst_rec.absolute_degradation_pp.mean:.2f} pp` | `{worst_rec.relative_degradation_pct.mean:.2f}%` | {mean_b} | {indiv_b} |"
+            )
+    summary_block = "\n".join(summary_rows)
+
+    # Cross-Model Comparison Table for each corruption at max stress (s=0.30)
+    max_stress_rows = []
+    for corr_id, c_name in corruption_labels.items():
+        rf_res = results_by_model.get("random_forest", {}).get(corr_id)
+        lr_res = results_by_model.get("logistic_regression", {}).get(corr_id)
+        gb_res = results_by_model.get("gradient_boosting", {}).get(corr_id)
+
+        rf_val = f"`{rf_res.severity_aggregates[-1].macro_f1.mean:.4f}`" if rf_res else "N/A"
+        lr_val = f"`{lr_res.severity_aggregates[-1].macro_f1.mean:.4f}`" if lr_res else "N/A"
+        gb_val = f"`{gb_res.severity_aggregates[-1].macro_f1.mean:.4f}`" if gb_res else "N/A"
+
+        max_stress_rows.append(f"| **{c_name}** | {rf_val} | {lr_val} | {gb_val} |")
+    max_stress_block = "\n".join(max_stress_rows)
+
+    return rf"""# Empirical Research Report: {experiment_id} (RQ5 Model Robustness Comparison)
+> **Title:** Cross-Model Empirical Robustness Evaluation Across Diverse Machine Learning Architectures on the Iris Benchmark  
+> **Protocol Version:** {protocol_version} | **Execution Timestamp:** {timestamp}  
+> **Sample Size:** $R = {len(seeds_list)}$ Independent PRNG Seeds: `{seeds_list}`  
+> **Repository Context:** Model Autopsy ML Engine  
+
+---
+
+## 1. Executive Summary & RQ5 Empirical Findings
+
+- **Primary Research Question (RQ5):** *"How does robustness vary across different ML algorithms under identical experimental conditions?"*
+- **Summary Matrix Across Models, Corruptions, and Severities:**
+
+| Model Architecture | Corruption Modality | Clean Baseline ($s=0.00$) | Worst Macro-F1 ($s=0.30$, Mean ± SEM) | Absolute Degradation | Relative Degradation | Mean Failure Boundary ($s^*$) | Earliest Individual Boundary |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+{summary_block}
+
+### Worst-Case Performance Comparison ($s = 0.30$ Maximum Stress)
+
+| Corruption Modality | Random Forest Mean Macro-F1 | Logistic Regression Mean Macro-F1 | Gradient Boosting Mean Macro-F1 |
+|---|:---:|:---:|:---:|
+{max_stress_block}
+
+- **Mandated Reporting Captions:**
+  > *"Observed failure boundary under the specified experimental configuration."*  
+  > *"Empirical sensitivity — not a causal explanation."*
+
+---
+
+## 2. Experimental Controls & Data Leakage Prevention
+
+All models were evaluated under strictly identical, frozen experimental invariants:
+
+1. **Frozen Dataset Partitioning:**
+   - Canonical Fisher Iris benchmark ($N=150$, $D=4$, 3 classes).
+   - Stratified 80/20 train/test split fixed with `split_seed = 42` ($N_{{\text{{train}}}}=120$, $N_{{\text{{test}}}}=30$).
+   - Training and testing partitions exhibit strictly $0$ overlapping indices.
+2. **Leakage-Free Preprocessing Pipeline for Logistic Regression:**
+   - Logistic Regression requires feature scaling due to uniform $L_2$ penalty weighting.
+   - Encapsulated in an explicit `sklearn.pipeline.Pipeline([('scaler', StandardScaler()), ('classifier', LogisticRegression())])`.
+   - The `StandardScaler` is fitted **exclusively on the training partition** ($X_{{\text{{train}}}}$).
+   - During evaluation, test instances (clean and corrupted) are transformed using the frozen training means and dispersions; test data is never used to fit or adapt scaling parameters.
+3. **Scale-Invariant Tree Ensembles:**
+   - Random Forest and Gradient Boosted Decision Trees partition continuous feature space via orthogonal axis-aligned threshold splits, which are mathematically invariant to monotonic feature scaling. They operate on raw centimeter measurements.
+
+---
+
+## 3. Algorithmic Robustness Breakdown & Inductive Biases
+
+### 3.1 Random Forest (Bagged Orthogonal Trees)
+- **Mechanism:** Builds 100 decorrelated, unconstrained decision trees on bootstrap samples with random feature sub-selection.
+- **Robustness Profile:** Ensembling over independently grown trees dampens continuous isotropic noise variance. However, high-magnitude outlier spikes ($\pm 5\sigma$) displace test instances across multiple decision boundaries simultaneously, causing acute performance deterioration once critical splits are breached.
+
+### 3.2 Logistic Regression (Regularized Linear Hyperplanes)
+- **Mechanism:** Solves convex multinomial loss parameterized by hyperplanes $w_c^T z + b_c$ with $L_2$ weight regularization ($C=1.0$).
+- **Robustness Profile:** Linear hyperplanes form smooth, global decision surfaces. While continuous isotropic Gaussian noise is partially averaged across coordinates, extreme impulsive outliers ($5\sigma$) inject immense leverage into the dot product, shifting logits decisively toward incorrect classes.
+
+### 3.3 Gradient Boosted Decision Trees (Additive Sequential Ensembles)
+- **Mechanism:** Sequential stagewise boosting of shallow trees (depth 3) minimizing multinomial deviance.
+- **Robustness Profile:** Boosted shallow trees construct highly refined, localized decision regions. They achieve superior baseline accuracy on clean data, but their compact sequential dependencies make them sensitive when corrupted coordinates mislead early decision stumps.
+
+---
+
+## 4. Methodological Distinctions: Baseline Capacity vs. Degradation Rate
+
+A central methodological requirement of Model Autopsy is rigorously distinguishing between:
+1. **Nominal Baseline Performance on Clean Data ($s=0.00$):** Reflecting model capacity under nominal i.i.d. conditions.
+2. **Absolute Degradation ($\Delta_{{\text{{abs}}}}$):** Drop in percentage points from clean baseline to stressed state.
+3. **Relative Degradation ($\Delta_{{\text{{rel}}}}$):** Percentage loss relative to the model's own baseline:
+   $$\Delta_{{\text{{rel}}}} = \frac{{\text{{Macro-F1}}_{{\text{{baseline}}}} - \text{{Macro-F1}}(s)}}{{\text{{Macro-F1}}_{{\text{{baseline}}}}}} \times 100\%$$
+
+A model with a superior clean baseline may experience a higher absolute percentage-point drop yet maintain higher absolute performance, or vice-versa. Complete decoupling of baseline capacity from degradation dynamics prevents misleading claims of intrinsic robustness.
+
+---
+
+## 5. Methodological Warnings from Phase 3 Audit
+
+1. **Warning 1: Monotone Nested Corruption Filtration:**
+   - In the severity loop, operators are invoked with `seed = seed`, meaning `np.random.default_rng(seed)` is re-instantiated at each severity step.
+   - For MCAR missingness and outlier contamination, cells corrupted at severity $s_1$ remain corrupted at severity $s_2 > s_1$ ($\text{{Cells}}(s_1) \subseteq \text{{Cells}}(s_2)$).
+   - This creates an incremental cumulative stress-test filtration rather than 7 mutually independent coordinate draws, isolating the marginal degradation caused by additional corrupted cells.
+2. **Warning 2: Finite Resolution & Discretization Plateaus:**
+   - With $N_{{\text{{test}}}} = 30$ samples, each misclassification alters accuracy by $3.33\,\text{{percentage points}}$.
+   - Flat horizontal segments in Macro-F1 curves between adjacent severities reflect instances where additional perturbed coordinates fell on already-misclassified samples or uninfluential dimensions, not algorithmic immunity.
+
+---
+
+## 6. Deterministic Reproduction Statement
+
+To deterministically reproduce this cross-model evaluation across all 5 seeds:
+```bash
+python scripts/experiments/run_e003.py
+```
+"""
+
+

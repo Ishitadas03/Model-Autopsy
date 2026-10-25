@@ -147,3 +147,195 @@ def plot_robustness_curve(
     plt.close(fig)
 
     return output_path
+
+
+def plot_multiseed_robustness_curve(
+    severity_aggregates: List[Any],
+    output_path: Path,
+    per_seed_runs: Optional[Dict[int, Dict[str, Any]]] = None,
+    failure_threshold: float = 0.80,
+    experiment_id: str = "E001",
+    model_name: str = "Random Forest (R=5 Seeds)",
+    dataset_name: str = "Iris Flower Dataset",
+) -> Path:
+    """Plot publication-grade multi-seed robustness curve with 95% Student's t CI band.
+
+    Args:
+        severity_aggregates: List of SeverityAggregateStatistics objects or dictionaries.
+        output_path: Destination path for PNG artifact.
+        per_seed_runs: Optional dictionary of individual seed run results for dispersion lines.
+        failure_threshold: Reliability threshold line (default 0.80).
+        experiment_id: Experiment ID for title.
+        model_name: Model descriptor.
+        dataset_name: Dataset descriptor.
+
+    Returns:
+        Path to the saved PNG plot.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    severities = []
+    mean_f1s = []
+    ci_lowers = []
+    ci_uppers = []
+    mean_accs = []
+
+    for agg in severity_aggregates:
+        if hasattr(agg, "severity"):
+            sev = float(agg.severity)
+            m_f1 = float(agg.macro_f1.mean)
+            low = float(agg.macro_f1.ci_lower)
+            high = float(agg.macro_f1.ci_upper)
+            m_acc = float(agg.accuracy.mean)
+        else:
+            sev = float(agg["severity"])
+            m_f1 = float(agg["macro_f1"]["mean"])
+            low = float(agg["macro_f1"]["ci_lower"])
+            high = float(agg["macro_f1"]["ci_upper"])
+            m_acc = float(agg["accuracy"]["mean"])
+
+        severities.append(sev)
+        mean_f1s.append(m_f1)
+        ci_lowers.append(low)
+        ci_uppers.append(high)
+        mean_accs.append(m_acc)
+
+    fig, ax = plt.subplots(figsize=(9.5, 6.0), dpi=300)
+
+    # Dark-mode styling
+    ax.set_facecolor("#0D0E12")
+    fig.patch.set_facecolor("#070709")
+
+    # Grid
+    ax.grid(True, linestyle="--", linewidth=0.6, color="#232733", alpha=0.8, zorder=1)
+
+    # Shaded failure regime below threshold
+    min_x, max_x = min(severities), max(severities)
+    x_pad = (max_x - min_x) * 0.04 if max_x > min_x else 0.01
+    ax.axhspan(0.0, failure_threshold, facecolor="#FF4D2D", alpha=0.10, zorder=2, label="Failure Regime (< 0.80)")
+
+    # Failure threshold horizontal dashed line
+    ax.axhline(
+        y=failure_threshold,
+        color="#FF4D2D",
+        linestyle="--",
+        linewidth=1.4,
+        alpha=0.9,
+        zorder=3,
+        label=f"Failure Threshold ({failure_threshold:.2f})",
+    )
+
+    # Shaded 95% Student's t CI band for Macro-F1
+    ax.fill_between(
+        severities,
+        ci_lowers,
+        ci_uppers,
+        color="#38BDF8",
+        alpha=0.22,
+        zorder=4,
+        label="Mean Macro-F1 95% CI (Student's t, df=4)",
+    )
+
+    # Individual seed trajectories if provided
+    if per_seed_runs:
+        for seed_val, s_data in per_seed_runs.items():
+            s_recs = s_data.get("severity_records", [])
+            s_sevs = [float(r["severity"]) for r in s_recs]
+            s_f1s = [float(r["macro_f1"]) for r in s_recs]
+            ax.plot(
+                s_sevs,
+                s_f1s,
+                color="#64748B",
+                linestyle="--",
+                linewidth=0.9,
+                alpha=0.45,
+                zorder=4,
+            )
+        # Dummy line for legend
+        ax.plot([], [], color="#64748B", linestyle="--", linewidth=0.9, alpha=0.6, label="Individual Seed Runs (R=5)")
+
+    # Primary Curve: Mean Macro-F1
+    ax.plot(
+        severities,
+        mean_f1s,
+        color="#38BDF8",  # Electric sky blue
+        marker="o",
+        markersize=7,
+        linewidth=2.4,
+        zorder=5,
+        label="Mean Macro-F1 (Primary)",
+    )
+
+    # Secondary Curve: Mean Accuracy
+    ax.plot(
+        severities,
+        mean_accs,
+        color="#A78BFA",  # Violet
+        marker="s",
+        markersize=5,
+        linewidth=1.6,
+        linestyle=":",
+        alpha=0.85,
+        zorder=5,
+        label="Mean Accuracy (Secondary)",
+    )
+
+    # Annotate mean Macro-F1 points
+    for s, m, low, high in zip(severities, mean_f1s, ci_lowers, ci_uppers):
+        ax.annotate(
+            f"{m:.3f}\n[±{(high - low)/2:.3f}]",
+            (s, m),
+            textcoords="offset points",
+            xytext=(0, 10),
+            ha="center",
+            fontsize=8,
+            color="#E2E8F0",
+            fontfamily="monospace",
+            zorder=6,
+        )
+
+    ax.set_xlim(min_x - x_pad, max_x + x_pad)
+    ax.set_ylim(0.50, 1.05)
+
+    ax.set_xlabel("Gaussian Noise Severity ($s$)", fontsize=11, fontweight="semibold", color="#F1F5F9", labelpad=8)
+    ax.set_ylabel("Evaluation Metric Score", fontsize=11, fontweight="semibold", color="#F1F5F9", labelpad=8)
+    ax.set_title(
+        f"Multi-Seed Robustness Degradation Trajectory (R=5 Seeds) — {experiment_id}\n"
+        f"Model: {model_name} | Dataset: {dataset_name}",
+        fontsize=12,
+        fontweight="bold",
+        color="#F8FAFC",
+        pad=12,
+    )
+
+    ax.tick_params(colors="#94A3B8", labelsize=9.5)
+    for spine in ax.spines.values():
+        spine.set_color("#334155")
+        spine.set_linewidth(0.8)
+
+    legend = ax.legend(
+        loc="lower left",
+        facecolor="#111318",
+        edgecolor="#334155",
+        fontsize=8.5,
+        labelcolor="#E2E8F0",
+    )
+    legend.get_frame().set_alpha(0.92)
+
+    fig.text(
+        0.5,
+        0.015,
+        "Observed failure boundary under the specified experimental configuration.",
+        ha="center",
+        fontsize=8.5,
+        fontstyle="italic",
+        color="#64748B",
+    )
+
+    plt.tight_layout(rect=[0, 0.04, 1, 1])
+    plt.savefig(output_path, dpi=300, facecolor=fig.get_facecolor(), edgecolor="none")
+    plt.close(fig)
+
+    return output_path
+

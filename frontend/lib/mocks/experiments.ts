@@ -161,7 +161,61 @@ export const DRAFT_EXPERIMENT: Experiment = {
   progressPercent: 0,
 };
 
+export const E003_EXPERIMENT: Experiment = {
+  id: 'E003',
+  title: 'RQ5: Multi-Model Robustness Comparison Across Corruptions',
+  datasetId: 'iris',
+  datasetName: 'Iris Flower Dataset',
+  modelId: 'multi-model-suite',
+  modelName: 'RF vs LogReg vs GradBoost',
+  taskType: 'classification',
+  stressConfig: {
+    type: 'gaussian_noise',
+    severityLevels: [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3],
+    mode: 'structured',
+  },
+  metric: 'f1',
+  failureThreshold: 0.8,
+  testSize: 0.2,
+  seed: 42,
+  numSeeds: 5,
+  status: 'completed',
+  createdAt: '2026-10-25T09:41:47Z',
+  completedAt: '2026-10-25T09:42:04Z',
+  progressPercent: 100,
+  results: {
+    baselineMetrics: {
+      f1: 0.9265,
+      accuracy: 0.9267,
+    },
+    worstCaseMetrics: {
+      f1: 0.7434,
+      accuracy: 0.74,
+    },
+    failureThreshold: 0.8,
+    observedBoundary: 0.25,
+    observedBoundaryLabel: MANDATED_BOUNDARY_CAPTION,
+    failedSamplesCount: 5,
+    statisticalValidation: {
+      numSeeds: 5,
+      mean: 0.841,
+      std: 0.043,
+      ci95: 0.038,
+    },
+    curveData: [
+      { severity: 0.0, f1: 0.9265, accuracy: 0.9267, baseline: 0.9265, threshold: 0.8 },
+      { severity: 0.05, f1: 0.9131, accuracy: 0.9133, baseline: 0.9265, threshold: 0.8 },
+      { severity: 0.1, f1: 0.8876, accuracy: 0.8867, baseline: 0.9265, threshold: 0.8 },
+      { severity: 0.15, f1: 0.8489, accuracy: 0.8467, baseline: 0.9265, threshold: 0.8 },
+      { severity: 0.2, f1: 0.8034, accuracy: 0.8, baseline: 0.9265, threshold: 0.8 },
+      { severity: 0.25, f1: 0.7779, accuracy: 0.7733, baseline: 0.9265, threshold: 0.8 },
+      { severity: 0.3, f1: 0.7434, accuracy: 0.74, baseline: 0.9265, threshold: 0.8 },
+    ],
+  },
+};
+
 export const MOCK_EXPERIMENTS: Experiment[] = [
+  E003_EXPERIMENT,
   HERO_EXPERIMENT,
   IRIS_EXPERIMENT,
   FAILED_EXPERIMENT,

@@ -1,0 +1,51 @@
+experiment:
+  id: "E001"
+  name: "Gaussian Noise Robustness Evaluation of a Random Forest Classifier on the Iris Dataset"
+  protocol_version: "1.0.0"
+  description: "Empirical evaluation of classification performance degradation and failure boundary detection in a Random Forest classifier subjected to controlled additive Gaussian input noise on the Iris dataset."
+
+dataset:
+  name: "iris"
+  source: "sklearn.datasets.load_iris"
+  task_type: "multiclass_classification"
+  n_instances: 150
+  n_features: 4
+  n_classes: 3
+  split:
+    method: "stratified_random"
+    train_ratio: 0.80
+    test_ratio: 0.20
+    split_seed: 42
+
+model:
+  family: "ensemble"
+  adapter: "sklearn_rf"
+  class_name: "RandomForestClassifier"
+  hyperparameters:
+    n_estimators: 100
+    max_depth: null
+    criterion: "gini"
+    min_samples_split: 2
+    min_samples_leaf: 1
+    bootstrap: true
+  dev_seed: 42
+  research_seeds: [42, 123, 456, 789, 1011]
+
+stress_test:
+  type: "noise"
+  family: "gaussian_noise"
+  formula: "epsilon_ij ~ Normal(0, (s * sigma_j)^2)"
+  dispersion_source: "train_only"
+  severities: [0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
+  noise_seed: 42
+
+evaluation:
+  primary_metric: "macro_f1"
+  secondary_metrics: ["accuracy", "confusion_matrix"]
+  failure_threshold: 0.80
+  strict_comparison: true
+  relative_drop_diagnostic_threshold_pct: 15.0
+
+artifacts:
+  output_dir: "artifacts/experiments/E001"
+  generate_plot: true

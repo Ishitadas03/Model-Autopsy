@@ -1,0 +1,349 @@
+{
+  "experiment_id": "E001",
+  "protocol_version": "1.0.0",
+  "timestamp_utc": "2026-10-25T08:22:55.870859+00:00",
+  "dataset": "iris",
+  "model": "RandomForestClassifier",
+  "failure_threshold": 0.8,
+  "baseline_macro_f1": 0.8997,
+  "baseline_accuracy": 0.9,
+  "observed_failure_boundary": null,
+  "is_boundary_observed": false,
+  "severities_evaluated": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3
+  ],
+  "severity_results": [
+    {
+      "severity": 0.0,
+      "macro_f1": 0.8997,
+      "accuracy": 0.9,
+      "absolute_degradation_pp": 0.0,
+      "relative_degradation_pct": 0.0,
+      "is_failed": false,
+      "rel_drop_exceeds_15_pct": false,
+      "per_class_f1": [
+        1.0,
+        0.8571,
+        0.8421
+      ],
+      "per_class_precision": [
+        1.0,
+        0.8182,
+        0.8889
+      ],
+      "per_class_recall": [
+        1.0,
+        0.9,
+        0.8
+      ],
+      "confusion_matrix": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          9,
+          1
+        ],
+        [
+          0,
+          2,
+          8
+        ]
+      ]
+    },
+    {
+      "severity": 0.05,
+      "macro_f1": 0.9333,
+      "accuracy": 0.9333,
+      "absolute_degradation_pp": -3.36,
+      "relative_degradation_pct": -3.7346,
+      "is_failed": false,
+      "rel_drop_exceeds_15_pct": false,
+      "per_class_f1": [
+        1.0,
+        0.9,
+        0.9
+      ],
+      "per_class_precision": [
+        1.0,
+        0.9,
+        0.9
+      ],
+      "per_class_recall": [
+        1.0,
+        0.9,
+        0.9
+      ],
+      "confusion_matrix": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          9,
+          1
+        ],
+        [
+          0,
+          1,
+          9
+        ]
+      ]
+    },
+    {
+      "severity": 0.1,
+      "macro_f1": 0.9333,
+      "accuracy": 0.9333,
+      "absolute_degradation_pp": -3.36,
+      "relative_degradation_pct": -3.7346,
+      "is_failed": false,
+      "rel_drop_exceeds_15_pct": false,
+      "per_class_f1": [
+        1.0,
+        0.9,
+        0.9
+      ],
+      "per_class_precision": [
+        1.0,
+        0.9,
+        0.9
+      ],
+      "per_class_recall": [
+        1.0,
+        0.9,
+        0.9
+      ],
+      "confusion_matrix": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          9,
+          1
+        ],
+        [
+          0,
+          1,
+          9
+        ]
+      ]
+    },
+    {
+      "severity": 0.15,
+      "macro_f1": 0.8997,
+      "accuracy": 0.9,
+      "absolute_degradation_pp": 0.0,
+      "relative_degradation_pct": 0.0,
+      "is_failed": false,
+      "rel_drop_exceeds_15_pct": false,
+      "per_class_f1": [
+        1.0,
+        0.8421,
+        0.8571
+      ],
+      "per_class_precision": [
+        1.0,
+        0.8889,
+        0.8182
+      ],
+      "per_class_recall": [
+        1.0,
+        0.8,
+        0.9
+      ],
+      "confusion_matrix": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          8,
+          2
+        ],
+        [
+          0,
+          1,
+          9
+        ]
+      ]
+    },
+    {
+      "severity": 0.2,
+      "macro_f1": 0.8997,
+      "accuracy": 0.9,
+      "absolute_degradation_pp": 0.0,
+      "relative_degradation_pct": 0.0,
+      "is_failed": false,
+      "rel_drop_exceeds_15_pct": false,
+      "per_class_f1": [
+        1.0,
+        0.8421,
+        0.8571
+      ],
+      "per_class_precision": [
+        1.0,
+        0.8889,
+        0.8182
+      ],
+      "per_class_recall": [
+        1.0,
+        0.8,
+        0.9
+      ],
+      "confusion_matrix": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          8,
+          2
+        ],
+        [
+          0,
+          1,
+          9
+        ]
+      ]
+    },
+    {
+      "severity": 0.25,
+      "macro_f1": 0.8997,
+      "accuracy": 0.9,
+      "absolute_degradation_pp": 0.0,
+      "relative_degradation_pct": 0.0,
+      "is_failed": false,
+      "rel_drop_exceeds_15_pct": false,
+      "per_class_f1": [
+        1.0,
+        0.8421,
+        0.8571
+      ],
+      "per_class_precision": [
+        1.0,
+        0.8889,
+        0.8182
+      ],
+      "per_class_recall": [
+        1.0,
+        0.8,
+        0.9
+      ],
+      "confusion_matrix": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          8,
+          2
+        ],
+        [
+          0,
+          1,
+          9
+        ]
+      ]
+    },
+    {
+      "severity": 0.3,
+      "macro_f1": 0.8653,
+      "accuracy": 0.8667,
+      "absolute_degradation_pp": 3.44,
+      "relative_degradation_pct": 3.8235,
+      "is_failed": false,
+      "rel_drop_exceeds_15_pct": false,
+      "per_class_f1": [
+        1.0,
+        0.7778,
+        0.8182
+      ],
+      "per_class_precision": [
+        1.0,
+        0.875,
+        0.75
+      ],
+      "per_class_recall": [
+        1.0,
+        0.7,
+        0.9
+      ],
+      "confusion_matrix": [
+        [
+          10,
+          0,
+          0
+        ],
+        [
+          0,
+          7,
+          3
+        ],
+        [
+          0,
+          1,
+          9
+        ]
+      ]
+    }
+  ],
+  "feature_vulnerabilities": [
+    {
+      "feature": "sepal length (cm)",
+      "feature_index": 0,
+      "drop": 0.0,
+      "macro_f1_isolated": 0.8997,
+      "accuracy_isolated": 0.9,
+      "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+      "rank": 1
+    },
+    {
+      "feature": "sepal width (cm)",
+      "feature_index": 1,
+      "drop": 0.0,
+      "macro_f1_isolated": 0.8997,
+      "accuracy_isolated": 0.9,
+      "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+      "rank": 2
+    },
+    {
+      "feature": "petal length (cm)",
+      "feature_index": 2,
+      "drop": 0.0,
+      "macro_f1_isolated": 0.9333,
+      "accuracy_isolated": 0.9333,
+      "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+      "rank": 3
+    },
+    {
+      "feature": "petal width (cm)",
+      "feature_index": 3,
+      "drop": 0.0,
+      "macro_f1_isolated": 0.9333,
+      "accuracy_isolated": 0.9333,
+      "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+      "rank": 4
+    }
+  ],
+  "boundary_caption": "Observed failure boundary under the specified experimental configuration."
+}

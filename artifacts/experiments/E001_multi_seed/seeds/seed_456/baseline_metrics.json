@@ -1,0 +1,40 @@
+{
+  "macro_f1": 0.9666,
+  "accuracy": 0.9667,
+  "per_class_f1": [
+    1.0,
+    0.9474,
+    0.9524
+  ],
+  "per_class_precision": [
+    1.0,
+    1.0,
+    0.9091
+  ],
+  "per_class_recall": [
+    1.0,
+    0.9,
+    1.0
+  ],
+  "confusion_matrix": [
+    [
+      10,
+      0,
+      0
+    ],
+    [
+      0,
+      9,
+      1
+    ],
+    [
+      0,
+      0,
+      10
+    ]
+  ],
+  "absolute_degradation_pp": 0.0,
+  "relative_degradation_pct": 0.0,
+  "is_failed": false,
+  "rel_drop_exceeds_15_pct": false
+}

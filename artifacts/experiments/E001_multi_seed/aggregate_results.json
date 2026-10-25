@@ -1,0 +1,2316 @@
+{
+  "experiment_id": "E001",
+  "seeds": [
+    42,
+    123,
+    456,
+    789,
+    1011
+  ],
+  "severities": [
+    0.0,
+    0.05,
+    0.1,
+    0.15,
+    0.2,
+    0.25,
+    0.3
+  ],
+  "failure_threshold": 0.8,
+  "n_total_seeds": 5,
+  "n_successful_seeds": 5,
+  "n_failed_seeds": 0,
+  "failed_seed_details": [],
+  "per_seed_results": {
+    "42": {
+      "status": "success",
+      "experiment_id": "E001",
+      "seeds": {
+        "split_seed": 42,
+        "model_seed": 42,
+        "noise_seed": 42,
+        "planned_research_seeds": [
+          42,
+          123,
+          456,
+          789,
+          1011
+        ]
+      },
+      "baseline_macro_f1": 0.8997,
+      "baseline_accuracy": 0.9,
+      "failure_boundary": {
+        "observed_boundary": null,
+        "is_boundary_observed": false,
+        "threshold": 0.8,
+        "tested_severities": [
+          0.0,
+          0.05,
+          0.1,
+          0.15,
+          0.2,
+          0.25,
+          0.3
+        ],
+        "boundary_caption": "Observed failure boundary under the specified experimental configuration.",
+        "summary_message": "Failure boundary not observed within tested severity range (s* > 0.30). Model maintained macro_f1 >= 0.80 across all tested levels."
+      },
+      "severity_records": [
+        {
+          "severity": 0.0,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8571,
+            0.8421
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8182,
+            0.8889
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.8
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              2,
+              8
+            ]
+          ]
+        },
+        {
+          "severity": 0.05,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": -3.36,
+          "relative_degradation_pct": -3.7346,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.1,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": -3.36,
+          "relative_degradation_pct": -3.7346,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.15,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8421,
+            0.8571
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8889,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.2,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8421,
+            0.8571
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8889,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.25,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8421,
+            0.8571
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8889,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.3,
+          "macro_f1": 0.8653,
+          "accuracy": 0.8667,
+          "absolute_degradation_pp": 3.44,
+          "relative_degradation_pct": 3.8235,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.7778,
+            0.8182
+          ],
+          "per_class_precision": [
+            1.0,
+            0.875,
+            0.75
+          ],
+          "per_class_recall": [
+            1.0,
+            0.7,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              7,
+              3
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        }
+      ],
+      "feature_vulnerabilities": [
+        {
+          "feature": "sepal length (cm)",
+          "feature_index": 0,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.8997,
+          "accuracy_isolated": 0.9,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 1
+        },
+        {
+          "feature": "sepal width (cm)",
+          "feature_index": 1,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.8997,
+          "accuracy_isolated": 0.9,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 2
+        },
+        {
+          "feature": "petal length (cm)",
+          "feature_index": 2,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9333,
+          "accuracy_isolated": 0.9333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 3
+        },
+        {
+          "feature": "petal width (cm)",
+          "feature_index": 3,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9333,
+          "accuracy_isolated": 0.9333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 4
+        }
+      ],
+      "artifacts": {
+        "results.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\results.csv",
+        "severity_metrics.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\severity_metrics.csv",
+        "baseline_metrics.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\baseline_metrics.json",
+        "robustness_curve.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\robustness_curve.json",
+        "failure_analysis.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\failure_analysis.json",
+        "results.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\results.json",
+        "manifest.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\manifest.json",
+        "report.md": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\report.md",
+        "robustness_curve.png": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_42\\robustness_curve.png"
+      }
+    },
+    "123": {
+      "status": "success",
+      "experiment_id": "E001",
+      "seeds": {
+        "split_seed": 42,
+        "model_seed": 123,
+        "noise_seed": 123,
+        "planned_research_seeds": [
+          42,
+          123,
+          456,
+          789,
+          1011
+        ]
+      },
+      "baseline_macro_f1": 0.9333,
+      "baseline_accuracy": 0.9333,
+      "failure_boundary": {
+        "observed_boundary": 0.3,
+        "is_boundary_observed": true,
+        "threshold": 0.8,
+        "tested_severities": [
+          0.0,
+          0.05,
+          0.1,
+          0.15,
+          0.2,
+          0.25,
+          0.3
+        ],
+        "boundary_caption": "Observed failure boundary under the specified experimental configuration.",
+        "summary_message": "Observed failure boundary detected at s* = 0.30 (macro_f1 = 0.7452 < 0.80)."
+      },
+      "severity_records": [
+        {
+          "severity": 0.0,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.05,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.1,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 3.36,
+          "relative_degradation_pct": 3.6001,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8421,
+            0.8571
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8889,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.15,
+          "macro_f1": 0.8667,
+          "accuracy": 0.8667,
+          "absolute_degradation_pp": 6.66,
+          "relative_degradation_pct": 7.136,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8,
+            0.8
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8,
+            0.8
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.8
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              2,
+              8
+            ]
+          ]
+        },
+        {
+          "severity": 0.2,
+          "macro_f1": 0.8295,
+          "accuracy": 0.8333,
+          "absolute_degradation_pp": 10.38,
+          "relative_degradation_pct": 11.1218,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.7059,
+            0.7826
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8571,
+            0.6923
+          ],
+          "per_class_recall": [
+            1.0,
+            0.6,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              6,
+              4
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.25,
+          "macro_f1": 0.8611,
+          "accuracy": 0.8667,
+          "absolute_degradation_pp": 7.22,
+          "relative_degradation_pct": 7.736,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.75,
+            0.8333
+          ],
+          "per_class_precision": [
+            1.0,
+            1.0,
+            0.7143
+          ],
+          "per_class_recall": [
+            1.0,
+            0.6,
+            1.0
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              6,
+              4
+            ],
+            [
+              0,
+              0,
+              10
+            ]
+          ]
+        },
+        {
+          "severity": 0.3,
+          "macro_f1": 0.7452,
+          "accuracy": 0.7667,
+          "absolute_degradation_pp": 18.81,
+          "relative_degradation_pct": 20.1543,
+          "is_failed": true,
+          "rel_drop_exceeds_15_pct": true,
+          "per_class_f1": [
+            0.9524,
+            0.5333,
+            0.75
+          ],
+          "per_class_precision": [
+            0.9091,
+            0.8,
+            0.6429
+          ],
+          "per_class_recall": [
+            1.0,
+            0.4,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              1,
+              4,
+              5
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        }
+      ],
+      "feature_vulnerabilities": [
+        {
+          "feature": "sepal width (cm)",
+          "feature_index": 1,
+          "drop": 0.0336,
+          "macro_f1_isolated": 0.8997,
+          "accuracy_isolated": 0.9,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 1
+        },
+        {
+          "feature": "petal length (cm)",
+          "feature_index": 2,
+          "drop": 0.0336,
+          "macro_f1_isolated": 0.8997,
+          "accuracy_isolated": 0.9,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 2
+        },
+        {
+          "feature": "sepal length (cm)",
+          "feature_index": 0,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9666,
+          "accuracy_isolated": 0.9667,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 3
+        },
+        {
+          "feature": "petal width (cm)",
+          "feature_index": 3,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9333,
+          "accuracy_isolated": 0.9333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 4
+        }
+      ],
+      "artifacts": {
+        "results.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\results.csv",
+        "severity_metrics.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\severity_metrics.csv",
+        "baseline_metrics.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\baseline_metrics.json",
+        "robustness_curve.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\robustness_curve.json",
+        "failure_analysis.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\failure_analysis.json",
+        "results.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\results.json",
+        "manifest.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\manifest.json",
+        "report.md": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\report.md",
+        "robustness_curve.png": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_123\\robustness_curve.png"
+      }
+    },
+    "456": {
+      "status": "success",
+      "experiment_id": "E001",
+      "seeds": {
+        "split_seed": 42,
+        "model_seed": 456,
+        "noise_seed": 456,
+        "planned_research_seeds": [
+          42,
+          123,
+          456,
+          789,
+          1011
+        ]
+      },
+      "baseline_macro_f1": 0.9666,
+      "baseline_accuracy": 0.9667,
+      "failure_boundary": {
+        "observed_boundary": null,
+        "is_boundary_observed": false,
+        "threshold": 0.8,
+        "tested_severities": [
+          0.0,
+          0.05,
+          0.1,
+          0.15,
+          0.2,
+          0.25,
+          0.3
+        ],
+        "boundary_caption": "Observed failure boundary under the specified experimental configuration.",
+        "summary_message": "Failure boundary not observed within tested severity range (s* > 0.30). Model maintained macro_f1 >= 0.80 across all tested levels."
+      },
+      "severity_records": [
+        {
+          "severity": 0.0,
+          "macro_f1": 0.9666,
+          "accuracy": 0.9667,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9474,
+            0.9524
+          ],
+          "per_class_precision": [
+            1.0,
+            1.0,
+            0.9091
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            1.0
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              0,
+              10
+            ]
+          ]
+        },
+        {
+          "severity": 0.05,
+          "macro_f1": 0.9666,
+          "accuracy": 0.9667,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9474,
+            0.9524
+          ],
+          "per_class_precision": [
+            1.0,
+            1.0,
+            0.9091
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            1.0
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              0,
+              10
+            ]
+          ]
+        },
+        {
+          "severity": 0.1,
+          "macro_f1": 0.9666,
+          "accuracy": 0.9667,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9474,
+            0.9524
+          ],
+          "per_class_precision": [
+            1.0,
+            1.0,
+            0.9091
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            1.0
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              0,
+              10
+            ]
+          ]
+        },
+        {
+          "severity": 0.15,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": 3.33,
+          "relative_degradation_pct": 3.4451,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.2,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": 3.33,
+          "relative_degradation_pct": 3.4451,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.25,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 6.69,
+          "relative_degradation_pct": 6.9212,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8421,
+            0.8571
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8889,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.3,
+          "macro_f1": 0.8977,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 6.89,
+          "relative_degradation_pct": 7.1281,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8235,
+            0.8696
+          ],
+          "per_class_precision": [
+            1.0,
+            1.0,
+            0.7692
+          ],
+          "per_class_recall": [
+            1.0,
+            0.7,
+            1.0
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              7,
+              3
+            ],
+            [
+              0,
+              0,
+              10
+            ]
+          ]
+        }
+      ],
+      "feature_vulnerabilities": [
+        {
+          "feature": "sepal length (cm)",
+          "feature_index": 0,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9666,
+          "accuracy_isolated": 0.9667,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 1
+        },
+        {
+          "feature": "sepal width (cm)",
+          "feature_index": 1,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9666,
+          "accuracy_isolated": 0.9667,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 2
+        },
+        {
+          "feature": "petal length (cm)",
+          "feature_index": 2,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9666,
+          "accuracy_isolated": 0.9667,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 3
+        },
+        {
+          "feature": "petal width (cm)",
+          "feature_index": 3,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9666,
+          "accuracy_isolated": 0.9667,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 4
+        }
+      ],
+      "artifacts": {
+        "results.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\results.csv",
+        "severity_metrics.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\severity_metrics.csv",
+        "baseline_metrics.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\baseline_metrics.json",
+        "robustness_curve.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\robustness_curve.json",
+        "failure_analysis.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\failure_analysis.json",
+        "results.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\results.json",
+        "manifest.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\manifest.json",
+        "report.md": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\report.md",
+        "robustness_curve.png": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_456\\robustness_curve.png"
+      }
+    },
+    "789": {
+      "status": "success",
+      "experiment_id": "E001",
+      "seeds": {
+        "split_seed": 42,
+        "model_seed": 789,
+        "noise_seed": 789,
+        "planned_research_seeds": [
+          42,
+          123,
+          456,
+          789,
+          1011
+        ]
+      },
+      "baseline_macro_f1": 0.8997,
+      "baseline_accuracy": 0.9,
+      "failure_boundary": {
+        "observed_boundary": null,
+        "is_boundary_observed": false,
+        "threshold": 0.8,
+        "tested_severities": [
+          0.0,
+          0.05,
+          0.1,
+          0.15,
+          0.2,
+          0.25,
+          0.3
+        ],
+        "boundary_caption": "Observed failure boundary under the specified experimental configuration.",
+        "summary_message": "Failure boundary not observed within tested severity range (s* > 0.30). Model maintained macro_f1 >= 0.80 across all tested levels."
+      },
+      "severity_records": [
+        {
+          "severity": 0.0,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8571,
+            0.8421
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8182,
+            0.8889
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.8
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              2,
+              8
+            ]
+          ]
+        },
+        {
+          "severity": 0.05,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": -3.36,
+          "relative_degradation_pct": -3.7346,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.1,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8421,
+            0.8571
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8889,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.15,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8421,
+            0.8571
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8889,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.2,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8421,
+            0.8571
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8889,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              8,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.25,
+          "macro_f1": 0.8624,
+          "accuracy": 0.8667,
+          "absolute_degradation_pp": 3.73,
+          "relative_degradation_pct": 4.1458,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            0.9524,
+            0.7778,
+            0.8571
+          ],
+          "per_class_precision": [
+            0.9091,
+            0.875,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.7,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              1,
+              7,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.3,
+          "macro_f1": 0.8624,
+          "accuracy": 0.8667,
+          "absolute_degradation_pp": 3.73,
+          "relative_degradation_pct": 4.1458,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            0.9524,
+            0.7778,
+            0.8571
+          ],
+          "per_class_precision": [
+            0.9091,
+            0.875,
+            0.8182
+          ],
+          "per_class_recall": [
+            1.0,
+            0.7,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              1,
+              7,
+              2
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        }
+      ],
+      "feature_vulnerabilities": [
+        {
+          "feature": "petal length (cm)",
+          "feature_index": 2,
+          "drop": 0.0668,
+          "macro_f1_isolated": 0.8329,
+          "accuracy_isolated": 0.8333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 1
+        },
+        {
+          "feature": "petal width (cm)",
+          "feature_index": 3,
+          "drop": 0.033,
+          "macro_f1_isolated": 0.8667,
+          "accuracy_isolated": 0.8667,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 2
+        },
+        {
+          "feature": "sepal length (cm)",
+          "feature_index": 0,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9333,
+          "accuracy_isolated": 0.9333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 3
+        },
+        {
+          "feature": "sepal width (cm)",
+          "feature_index": 1,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9333,
+          "accuracy_isolated": 0.9333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 4
+        }
+      ],
+      "artifacts": {
+        "results.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\results.csv",
+        "severity_metrics.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\severity_metrics.csv",
+        "baseline_metrics.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\baseline_metrics.json",
+        "robustness_curve.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\robustness_curve.json",
+        "failure_analysis.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\failure_analysis.json",
+        "results.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\results.json",
+        "manifest.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\manifest.json",
+        "report.md": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\report.md",
+        "robustness_curve.png": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_789\\robustness_curve.png"
+      }
+    },
+    "1011": {
+      "status": "success",
+      "experiment_id": "E001",
+      "seeds": {
+        "split_seed": 42,
+        "model_seed": 1011,
+        "noise_seed": 1011,
+        "planned_research_seeds": [
+          42,
+          123,
+          456,
+          789,
+          1011
+        ]
+      },
+      "baseline_macro_f1": 0.9333,
+      "baseline_accuracy": 0.9333,
+      "failure_boundary": {
+        "observed_boundary": null,
+        "is_boundary_observed": false,
+        "threshold": 0.8,
+        "tested_severities": [
+          0.0,
+          0.05,
+          0.1,
+          0.15,
+          0.2,
+          0.25,
+          0.3
+        ],
+        "boundary_caption": "Observed failure boundary under the specified experimental configuration.",
+        "summary_message": "Failure boundary not observed within tested severity range (s* > 0.30). Model maintained macro_f1 >= 0.80 across all tested levels."
+      },
+      "severity_records": [
+        {
+          "severity": 0.0,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.05,
+          "macro_f1": 0.8997,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 3.36,
+          "relative_degradation_pct": 3.6001,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.8571,
+            0.8421
+          ],
+          "per_class_precision": [
+            1.0,
+            0.8182,
+            0.8889
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.8
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              2,
+              8
+            ]
+          ]
+        },
+        {
+          "severity": 0.1,
+          "macro_f1": 0.9666,
+          "accuracy": 0.9667,
+          "absolute_degradation_pp": -3.33,
+          "relative_degradation_pct": -3.568,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9474,
+            0.9524
+          ],
+          "per_class_precision": [
+            1.0,
+            1.0,
+            0.9091
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            1.0
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              0,
+              10
+            ]
+          ]
+        },
+        {
+          "severity": 0.15,
+          "macro_f1": 0.9666,
+          "accuracy": 0.9667,
+          "absolute_degradation_pp": -3.33,
+          "relative_degradation_pct": -3.568,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9474,
+            0.9524
+          ],
+          "per_class_precision": [
+            1.0,
+            1.0,
+            0.9091
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            1.0
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              0,
+              10
+            ]
+          ]
+        },
+        {
+          "severity": 0.2,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.25,
+          "macro_f1": 0.9333,
+          "accuracy": 0.9333,
+          "absolute_degradation_pp": 0.0,
+          "relative_degradation_pct": 0.0,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_precision": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.9,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              0,
+              9,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        },
+        {
+          "severity": 0.3,
+          "macro_f1": 0.8982,
+          "accuracy": 0.9,
+          "absolute_degradation_pp": 3.51,
+          "relative_degradation_pct": 3.7608,
+          "is_failed": false,
+          "rel_drop_exceeds_15_pct": false,
+          "per_class_f1": [
+            0.9524,
+            0.8421,
+            0.9
+          ],
+          "per_class_precision": [
+            0.9091,
+            0.8889,
+            0.9
+          ],
+          "per_class_recall": [
+            1.0,
+            0.8,
+            0.9
+          ],
+          "confusion_matrix": [
+            [
+              10,
+              0,
+              0
+            ],
+            [
+              1,
+              8,
+              1
+            ],
+            [
+              0,
+              1,
+              9
+            ]
+          ]
+        }
+      ],
+      "feature_vulnerabilities": [
+        {
+          "feature": "petal length (cm)",
+          "feature_index": 2,
+          "drop": 0.0666,
+          "macro_f1_isolated": 0.8667,
+          "accuracy_isolated": 0.8667,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 1
+        },
+        {
+          "feature": "sepal length (cm)",
+          "feature_index": 0,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9333,
+          "accuracy_isolated": 0.9333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 2
+        },
+        {
+          "feature": "sepal width (cm)",
+          "feature_index": 1,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9333,
+          "accuracy_isolated": 0.9333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 3
+        },
+        {
+          "feature": "petal width (cm)",
+          "feature_index": 3,
+          "drop": 0.0,
+          "macro_f1_isolated": 0.9333,
+          "accuracy_isolated": 0.9333,
+          "caveat": "Empirical sensitivity \u2014 not a causal explanation.",
+          "rank": 4
+        }
+      ],
+      "artifacts": {
+        "results.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\results.csv",
+        "severity_metrics.csv": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\severity_metrics.csv",
+        "baseline_metrics.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\baseline_metrics.json",
+        "robustness_curve.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\robustness_curve.json",
+        "failure_analysis.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\failure_analysis.json",
+        "results.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\results.json",
+        "manifest.json": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\manifest.json",
+        "report.md": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\report.md",
+        "robustness_curve.png": "C:\\Users\\ishit\\Model-Autopsy\\artifacts\\experiments\\E001_multi_seed\\seeds\\seed_1011\\robustness_curve.png"
+      }
+    }
+  },
+  "per_seed_boundaries": {
+    "42": null,
+    "123": 0.3,
+    "456": null,
+    "789": null,
+    "1011": null
+  },
+  "severity_aggregates": [
+    {
+      "severity": 0.0,
+      "n_successful_runs": 5,
+      "n_failed_runs": 0,
+      "macro_f1": {
+        "n": 5,
+        "mean": 0.9265,
+        "sample_std": 0.028,
+        "sem": 0.0125,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0348,
+        "ci_lower": 0.8917,
+        "ci_upper": 0.9613
+      },
+      "accuracy": {
+        "n": 5,
+        "mean": 0.9267,
+        "sample_std": 0.0279,
+        "sem": 0.0125,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0346,
+        "ci_lower": 0.892,
+        "ci_upper": 0.9613
+      },
+      "absolute_degradation_pp": {
+        "n": 5,
+        "mean": 0.0,
+        "sample_std": 0.0,
+        "sem": 0.0,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "relative_degradation_pct": {
+        "n": 5,
+        "mean": 0.0,
+        "sample_std": 0.0,
+        "sem": 0.0,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0,
+        "ci_lower": 0.0,
+        "ci_upper": 0.0
+      },
+      "failure_count": 0,
+      "failure_proportion": 0.0,
+      "is_mean_failed": false
+    },
+    {
+      "severity": 0.05,
+      "n_successful_runs": 5,
+      "n_failed_runs": 0,
+      "macro_f1": {
+        "n": 5,
+        "mean": 0.9332,
+        "sample_std": 0.0237,
+        "sem": 0.0106,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0294,
+        "ci_lower": 0.9039,
+        "ci_upper": 0.9626
+      },
+      "accuracy": {
+        "n": 5,
+        "mean": 0.9333,
+        "sample_std": 0.0236,
+        "sem": 0.0105,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0293,
+        "ci_lower": 0.904,
+        "ci_upper": 0.9626
+      },
+      "absolute_degradation_pp": {
+        "n": 5,
+        "mean": -0.672,
+        "sample_std": 2.8112,
+        "sem": 1.2572,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 3.4905,
+        "ci_lower": -4.1625,
+        "ci_upper": 2.8185
+      },
+      "relative_degradation_pct": {
+        "n": 5,
+        "mean": -0.7738,
+        "sample_std": 3.0766,
+        "sem": 1.3759,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 3.8201,
+        "ci_lower": -4.5939,
+        "ci_upper": 3.0463
+      },
+      "failure_count": 0,
+      "failure_proportion": 0.0,
+      "is_mean_failed": false
+    },
+    {
+      "severity": 0.1,
+      "n_successful_runs": 5,
+      "n_failed_runs": 0,
+      "macro_f1": {
+        "n": 5,
+        "mean": 0.9332,
+        "sample_std": 0.0335,
+        "sem": 0.015,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0415,
+        "ci_lower": 0.8916,
+        "ci_upper": 0.9747
+      },
+      "accuracy": {
+        "n": 5,
+        "mean": 0.9333,
+        "sample_std": 0.0334,
+        "sem": 0.0149,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0414,
+        "ci_lower": 0.8919,
+        "ci_upper": 0.9747
+      },
+      "absolute_degradation_pp": {
+        "n": 5,
+        "mean": -0.666,
+        "sample_std": 2.804,
+        "sem": 1.254,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 3.4817,
+        "ci_lower": -4.1477,
+        "ci_upper": 2.8157
+      },
+      "relative_degradation_pct": {
+        "n": 5,
+        "mean": -0.7405,
+        "sample_std": 3.0371,
+        "sem": 1.3583,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 3.7711,
+        "ci_lower": -4.5116,
+        "ci_upper": 3.0306
+      },
+      "failure_count": 0,
+      "failure_proportion": 0.0,
+      "is_mean_failed": false
+    },
+    {
+      "severity": 0.15,
+      "n_successful_runs": 5,
+      "n_failed_runs": 0,
+      "macro_f1": {
+        "n": 5,
+        "mean": 0.9132,
+        "sample_std": 0.038,
+        "sem": 0.017,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0472,
+        "ci_lower": 0.866,
+        "ci_upper": 0.9604
+      },
+      "accuracy": {
+        "n": 5,
+        "mean": 0.9133,
+        "sample_std": 0.038,
+        "sem": 0.017,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0472,
+        "ci_lower": 0.8662,
+        "ci_upper": 0.9605
+      },
+      "absolute_degradation_pp": {
+        "n": 5,
+        "mean": 1.332,
+        "sample_std": 3.7968,
+        "sem": 1.698,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 4.7143,
+        "ci_lower": -3.3823,
+        "ci_upper": 6.0463
+      },
+      "relative_degradation_pct": {
+        "n": 5,
+        "mean": 1.4026,
+        "sample_std": 4.0523,
+        "sem": 1.8123,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 5.0316,
+        "ci_lower": -3.629,
+        "ci_upper": 6.4342
+      },
+      "failure_count": 0,
+      "failure_proportion": 0.0,
+      "is_mean_failed": false
+    },
+    {
+      "severity": 0.2,
+      "n_successful_runs": 5,
+      "n_failed_runs": 0,
+      "macro_f1": {
+        "n": 5,
+        "mean": 0.8991,
+        "sample_std": 0.0424,
+        "sem": 0.019,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0526,
+        "ci_lower": 0.8465,
+        "ci_upper": 0.9517
+      },
+      "accuracy": {
+        "n": 5,
+        "mean": 0.9,
+        "sample_std": 0.0408,
+        "sem": 0.0183,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0507,
+        "ci_lower": 0.8493,
+        "ci_upper": 0.9507
+      },
+      "absolute_degradation_pp": {
+        "n": 5,
+        "mean": 2.742,
+        "sample_std": 4.5067,
+        "sem": 2.0154,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 5.5958,
+        "ci_lower": -2.8538,
+        "ci_upper": 8.3378
+      },
+      "relative_degradation_pct": {
+        "n": 5,
+        "mean": 2.9134,
+        "sample_std": 4.825,
+        "sem": 2.1578,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 5.9911,
+        "ci_lower": -3.0777,
+        "ci_upper": 8.9045
+      },
+      "failure_count": 0,
+      "failure_proportion": 0.0,
+      "is_mean_failed": false
+    },
+    {
+      "severity": 0.25,
+      "n_successful_runs": 5,
+      "n_failed_runs": 0,
+      "macro_f1": {
+        "n": 5,
+        "mean": 0.8912,
+        "sample_std": 0.0302,
+        "sem": 0.0135,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0375,
+        "ci_lower": 0.8537,
+        "ci_upper": 0.9288
+      },
+      "accuracy": {
+        "n": 5,
+        "mean": 0.8933,
+        "sample_std": 0.0279,
+        "sem": 0.0125,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0346,
+        "ci_lower": 0.8587,
+        "ci_upper": 0.9279
+      },
+      "absolute_degradation_pp": {
+        "n": 5,
+        "mean": 3.528,
+        "sample_std": 3.4844,
+        "sem": 1.5583,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 4.3264,
+        "ci_lower": -0.7984,
+        "ci_upper": 7.8544
+      },
+      "relative_degradation_pct": {
+        "n": 5,
+        "mean": 3.7606,
+        "sample_std": 3.6819,
+        "sem": 1.6466,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 4.5717,
+        "ci_lower": -0.8111,
+        "ci_upper": 8.3323
+      },
+      "failure_count": 0,
+      "failure_proportion": 0.0,
+      "is_mean_failed": false
+    },
+    {
+      "severity": 0.3,
+      "n_successful_runs": 5,
+      "n_failed_runs": 0,
+      "macro_f1": {
+        "n": 5,
+        "mean": 0.8538,
+        "sample_std": 0.063,
+        "sem": 0.0282,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.0783,
+        "ci_lower": 0.7755,
+        "ci_upper": 0.932
+      },
+      "accuracy": {
+        "n": 5,
+        "mean": 0.86,
+        "sample_std": 0.0548,
+        "sem": 0.0245,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 0.068,
+        "ci_lower": 0.792,
+        "ci_upper": 0.928
+      },
+      "absolute_degradation_pp": {
+        "n": 5,
+        "mean": 7.276,
+        "sample_std": 6.6078,
+        "sem": 2.9551,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 8.2047,
+        "ci_lower": -0.9287,
+        "ci_upper": 15.4807
+      },
+      "relative_degradation_pct": {
+        "n": 5,
+        "mean": 7.8025,
+        "sample_std": 7.0456,
+        "sem": 3.1509,
+        "df": 4,
+        "t_critical": 2.7764,
+        "margin_of_error": 8.7482,
+        "ci_lower": -0.9457,
+        "ci_upper": 16.5507
+      },
+      "failure_count": 1,
+      "failure_proportion": 0.2,
+      "is_mean_failed": false
+    }
+  ],
+  "mean_observed_boundary": null,
+  "earliest_individual_boundary": 0.3,
+  "boundary_caption": "Observed failure boundary under the specified experimental configuration.",
+  "monotonicity_summary": {
+    "is_strictly_monotonic": false,
+    "steps": [
+      {
+        "from_severity": 0.0,
+        "to_severity": 0.05,
+        "from_mean_f1": 0.9265,
+        "to_mean_f1": 0.9332,
+        "diff_pp": -0.67,
+        "is_decay_or_equal": false
+      },
+      {
+        "from_severity": 0.05,
+        "to_severity": 0.1,
+        "from_mean_f1": 0.9332,
+        "to_mean_f1": 0.9332,
+        "diff_pp": 0.0,
+        "is_decay_or_equal": true
+      },
+      {
+        "from_severity": 0.1,
+        "to_severity": 0.15,
+        "from_mean_f1": 0.9332,
+        "to_mean_f1": 0.9132,
+        "diff_pp": 2.0,
+        "is_decay_or_equal": true
+      },
+      {
+        "from_severity": 0.15,
+        "to_severity": 0.2,
+        "from_mean_f1": 0.9132,
+        "to_mean_f1": 0.8991,
+        "diff_pp": 1.41,
+        "is_decay_or_equal": true
+      },
+      {
+        "from_severity": 0.2,
+        "to_severity": 0.25,
+        "from_mean_f1": 0.8991,
+        "to_mean_f1": 0.8912,
+        "diff_pp": 0.79,
+        "is_decay_or_equal": true
+      },
+      {
+        "from_severity": 0.25,
+        "to_severity": 0.3,
+        "from_mean_f1": 0.8912,
+        "to_mean_f1": 0.8538,
+        "diff_pp": 3.74,
+        "is_decay_or_equal": true
+      }
+    ],
+    "note": "Monotonic decay holds if each step exhibits non-increasing mean performance. Minor non-monotonic increases at low severity can occur when isotropic noise incidentally shifts ambiguous borderline points toward true class clusters."
+  }
+}

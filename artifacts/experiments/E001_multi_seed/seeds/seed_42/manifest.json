@@ -1,0 +1,114 @@
+{
+  "experiment_id": "E001",
+  "experiment_name": "Gaussian Noise Robustness Evaluation of Random Forest on Iris",
+  "protocol_version": "1.0.0",
+  "timestamp_utc": "2026-10-25T08:22:55.873296+00:00",
+  "git_commit_hash": "d134cc5548d49149f26ef20b435f42226380f3bb",
+  "environment": {
+    "python_version": "3.13.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "os_system": "Windows",
+    "architecture": "AMD64",
+    "package_versions": {
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "scikit-learn": "1.9.0",
+      "pandas": "2.3.3",
+      "matplotlib": "3.10.8",
+      "pydantic": "2.12.4",
+      "pyyaml": "6.0.3"
+    }
+  },
+  "dataset": {
+    "name": "iris",
+    "n_instances": 150,
+    "n_train": 120,
+    "n_test": 30,
+    "feature_names": [
+      "sepal length (cm)",
+      "sepal width (cm)",
+      "petal length (cm)",
+      "petal width (cm)"
+    ],
+    "target_names": [
+      "setosa",
+      "versicolor",
+      "virginica"
+    ],
+    "dataset_hash": "aa06b8008ceba42efc654be0f83fdafc786239c9e8f13146044d078f5aab8f23",
+    "feature_train_std": [
+      0.84093,
+      0.44852,
+      1.76852,
+      0.76266
+    ],
+    "split_seed": 42
+  },
+  "model": {
+    "adapter": "RandomForestAdapter",
+    "class_name": "RandomForestClassifier",
+    "hyperparameters": {
+      "n_estimators": 100,
+      "max_depth": null,
+      "criterion": "gini",
+      "min_samples_split": 2,
+      "min_samples_leaf": 1,
+      "bootstrap": true,
+      "random_state": 42
+    },
+    "model_seed": 42
+  },
+  "noise_definition": {
+    "family": "additive_gaussian_noise",
+    "mathematical_formula": "epsilon_ij ~ Normal(0, (severity * train_std[j])^2)",
+    "dispersion_source": "train_partition_strictly",
+    "dispersion_degrees_of_freedom": "ddof=1",
+    "evaluated_severities": [
+      0.0,
+      0.05,
+      0.1,
+      0.15,
+      0.2,
+      0.25,
+      0.3
+    ]
+  },
+  "seeds": {
+    "split_seed": 42,
+    "model_seed": 42,
+    "noise_seed": 42,
+    "planned_research_seeds": [
+      42,
+      123,
+      456,
+      789,
+      1011
+    ]
+  },
+  "evaluation_criteria": {
+    "primary_metric": "macro_f1",
+    "secondary_metrics": [
+      "accuracy",
+      "confusion_matrix"
+    ],
+    "failure_threshold": 0.8,
+    "failure_rule": "macro_f1 < failure_threshold (strict less-than)",
+    "relative_drop_diagnostic_threshold_pct": 15.0
+  },
+  "observed_failure_boundary": null,
+  "boundary_caption": "Observed failure boundary under the specified experimental configuration.",
+  "artifacts_generated": {
+    "results.csv": "results.csv",
+    "severity_metrics.csv": "severity_metrics.csv",
+    "baseline_metrics.json": "baseline_metrics.json",
+    "robustness_curve.json": "robustness_curve.json",
+    "failure_analysis.json": "failure_analysis.json",
+    "results.json": "results.json"
+  },
+  "scientific_limitations": [
+    "Benchmark scale: Iris is a 4-feature, 150-instance benchmark; findings do not generalize across high-dimensional non-tabular domains.",
+    "Evaluation discretization: With N_test=30 (10/class), each misclassification changes metric by 3.33 percentage points.",
+    "Noise specificity: Additive isotropic Gaussian noise is a synthetic model and does not reflect structured or adversarial shifts.",
+    "Observational nature: Feature sensitivities reflect empirical variance and must not be interpreted causally."
+  ]
+}

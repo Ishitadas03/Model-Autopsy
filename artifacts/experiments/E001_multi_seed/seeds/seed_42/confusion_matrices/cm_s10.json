@@ -1,0 +1,25 @@
+{
+  "severity": 0.1,
+  "confusion_matrix": [
+    [
+      10,
+      0,
+      0
+    ],
+    [
+      0,
+      9,
+      1
+    ],
+    [
+      0,
+      1,
+      9
+    ]
+  ],
+  "class_names": [
+    "setosa",
+    "versicolor",
+    "virginica"
+  ]
+}

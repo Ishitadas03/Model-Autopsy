@@ -1,0 +1,54 @@
+{
+  "curve_data": [
+    {
+      "severity": 0.0,
+      "macro_f1": 0.8997,
+      "accuracy": 0.9,
+      "absolute_degradation_pp": 0.0,
+      "relative_degradation_pct": 0.0
+    },
+    {
+      "severity": 0.05,
+      "macro_f1": 0.9333,
+      "accuracy": 0.9333,
+      "absolute_degradation_pp": -3.36,
+      "relative_degradation_pct": -3.7346
+    },
+    {
+      "severity": 0.1,
+      "macro_f1": 0.8997,
+      "accuracy": 0.9,
+      "absolute_degradation_pp": 0.0,
+      "relative_degradation_pct": 0.0
+    },
+    {
+      "severity": 0.15,
+      "macro_f1": 0.8997,
+      "accuracy": 0.9,
+      "absolute_degradation_pp": 0.0,
+      "relative_degradation_pct": 0.0
+    },
+    {
+      "severity": 0.2,
+      "macro_f1": 0.8997,
+      "accuracy": 0.9,
+      "absolute_degradation_pp": 0.0,
+      "relative_degradation_pct": 0.0
+    },
+    {
+      "severity": 0.25,
+      "macro_f1": 0.8624,
+      "accuracy": 0.8667,
+      "absolute_degradation_pp": 3.73,
+      "relative_degradation_pct": 4.1458
+    },
+    {
+      "severity": 0.3,
+      "macro_f1": 0.8624,
+      "accuracy": 0.8667,
+      "absolute_degradation_pp": 3.73,
+      "relative_degradation_pct": 4.1458
+    }
+  ],
+  "threshold": 0.8
+}

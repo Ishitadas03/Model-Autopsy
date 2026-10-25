@@ -1,0 +1,8 @@
+severity,macro_f1,accuracy,absolute_degradation_pp,relative_degradation_pct,is_failed,rel_drop_exceeds_15_pct
+0.0,0.9666,0.9667,0.0,0.0,False,False
+0.05,0.9666,0.9667,0.0,0.0,False,False
+0.1,0.9666,0.9667,0.0,0.0,False,False
+0.15,0.9333,0.9333,3.33,3.4451,False,False
+0.2,0.9333,0.9333,3.33,3.4451,False,False
+0.25,0.8997,0.9,6.69,6.9212,False,False
+0.3,0.8977,0.9,6.89,7.1281,False,False

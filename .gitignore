@@ -31,7 +31,9 @@ htmlcov/
 .hypothesis/
 
 # Node
-frontend/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
 node_modules/
 .next/
 out/

@@ -1,7 +1,8 @@
-import { Experiment, FailedSample, Dataset, ModelAdapter } from './schemas';
-import { MOCK_EXPERIMENTS, MOCK_FAILED_SAMPLES, HERO_EXPERIMENT } from './mocks/experiments';
+import { Experiment, FailedSample, Dataset, ModelAdapter, E003ComparisonData } from './schemas';
+import { MOCK_EXPERIMENTS, MOCK_FAILED_SAMPLES, HERO_EXPERIMENT, E003_EXPERIMENT } from './mocks/experiments';
 import { MOCK_DATASETS } from './mocks/datasets';
 import { MOCK_MODELS } from './mocks/models';
+import { E003_FIXTURE_DATA } from './mocks/e003Data';
 
 const USE_MOCKS =
   typeof window !== 'undefined'
@@ -14,6 +15,12 @@ export interface HealthResponse {
   status: 'ok' | 'degraded' | 'error';
   mode: 'mock' | 'live';
   version: string;
+}
+
+export interface E003FetchResult {
+  data: E003ComparisonData | null;
+  isLive: boolean;
+  error: string | null;
 }
 
 export const api = {
@@ -35,14 +42,57 @@ export const api = {
   },
 
   async getExperiment(id: string): Promise<Experiment | null> {
+    if (id.toUpperCase() === 'E003') {
+      return { ...E003_EXPERIMENT };
+    }
     if (USE_MOCKS) {
       await new Promise((r) => setTimeout(r, 100));
-      const exp = runtimeExperiments.find((e) => e.id === id);
+      const exp = runtimeExperiments.find((e) => e.id.toLowerCase() === id.toLowerCase());
       return exp ? { ...exp } : null;
     }
     const res = await fetch(`/api/experiments/${id}`);
     if (!res.ok) return null;
     return res.json();
+  },
+
+  async getE003Data(forceMock = false): Promise<E003FetchResult> {
+    if (forceMock) {
+      return { data: E003_FIXTURE_DATA, isLive: false, error: null };
+    }
+    try {
+      const res = await fetch('/api/experiments/e003');
+      if (!res.ok) {
+        const errJson = await res.json().catch(() => ({}));
+        // If in explicit mock environment without backend, provide fixture:
+        if (USE_MOCKS && res.status === 404) {
+          return { data: E003_FIXTURE_DATA, isLive: false, error: null };
+        }
+        return {
+          data: null,
+          isLive: false,
+          error: errJson.error || `Failed to load E003 canonical artifact (HTTP ${res.status})`,
+        };
+      }
+      const json = await res.json();
+      return { data: json, isLive: true, error: null };
+    } catch (e: any) {
+      if (USE_MOCKS) {
+        return { data: E003_FIXTURE_DATA, isLive: false, error: null };
+      }
+      return {
+        data: null,
+        isLive: false,
+        error: e?.message || 'Network error fetching E003 experiment data.',
+      };
+    }
+  },
+
+  async getE003RawArtifact(format: 'json' | 'csv' | 'markdown' = 'json'): Promise<string> {
+    const res = await fetch(`/api/experiments/e003?format=${format}`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch artifact format ${format} (HTTP ${res.status})`);
+    }
+    return res.text();
   },
 
   async createExperiment(newExp: Omit<Experiment, 'id' | 'createdAt' | 'status' | 'progressPercent'>): Promise<Experiment> {
@@ -120,3 +170,4 @@ export const api = {
     return res.json();
   },
 };
+

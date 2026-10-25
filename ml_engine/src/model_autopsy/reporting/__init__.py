@@ -1,0 +1,5 @@
+"""Reporting and artifact generation modules for Model Autopsy."""
+
+from model_autopsy.reporting.artifacts import generate_artifacts, get_environment_metadata, get_git_commit_hash
+
+__all__ = ["generate_artifacts", "get_environment_metadata", "get_git_commit_hash"]

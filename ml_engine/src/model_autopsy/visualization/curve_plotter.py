@@ -339,3 +339,141 @@ def plot_multiseed_robustness_curve(
 
     return output_path
 
+
+def plot_e002_multicorruption_comparison(
+    corruption_aggregates: Dict[str, List[Dict[str, Any]]],
+    output_path: Path,
+    failure_threshold: float = 0.80,
+    experiment_id: str = "E002",
+    model_name: str = "Random Forest Classifier",
+    dataset_name: str = "Iris Flower Dataset",
+) -> Path:
+    """Plot multi-corruption robustness comparison with 95% Student's t CI bands for E002.
+
+    Args:
+        corruption_aggregates: Dictionary mapping corruption display label to list of
+                               aggregate records (each with 'severity', 'macro_f1_mean',
+                               'macro_f1_ci_lower', 'macro_f1_ci_upper').
+        output_path: Destination PNG file path.
+        failure_threshold: Predefined reliability threshold (default 0.80).
+        experiment_id: Experiment identifier for title.
+        model_name: Name of evaluated model.
+        dataset_name: Name of evaluated dataset.
+
+    Returns:
+        Path to the saved PNG plot.
+    """
+    output_path = Path(output_path)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig, ax = plt.subplots(figsize=(10, 6.0), dpi=300)
+
+    # Dark-mode scientific canvas
+    ax.set_facecolor("#0D0E12")
+    fig.patch.set_facecolor("#070709")
+
+    # Grid
+    ax.grid(True, linestyle="--", linewidth=0.6, color="#232733", alpha=0.8, zorder=1)
+
+    # Style mapping for each corruption modality
+    palette = [
+        {"color": "#00E5FF", "marker": "o", "label_prefix": "Gaussian Noise"},
+        {"color": "#FFB300", "marker": "s", "label_prefix": "MCAR Missingness (Imputed)"},
+        {"color": "#E040FB", "marker": "^", "label_prefix": "Outlier Contamination (5σ)"},
+    ]
+
+    all_severities = []
+
+    # Plot each corruption's mean curve and confidence band
+    for idx, (corr_name, records) in enumerate(corruption_aggregates.items()):
+        style = palette[idx % len(palette)]
+        severities = [float(r["severity"]) for r in records]
+        all_severities.extend(severities)
+        means = [float(r["macro_f1_mean"]) for r in records]
+        ci_lowers = [float(r["macro_f1_ci_lower"]) for r in records]
+        ci_uppers = [float(r["macro_f1_ci_upper"]) for r in records]
+
+        # Shaded 95% CI band
+        ax.fill_between(
+            severities,
+            ci_lowers,
+            ci_uppers,
+            color=style["color"],
+            alpha=0.15,
+            zorder=3,
+            label=f"{corr_name} 95% CI (t, df=4)",
+        )
+
+        # Mean trajectory
+        ax.plot(
+            severities,
+            means,
+            color=style["color"],
+            marker=style["marker"],
+            markersize=6,
+            linewidth=2.2,
+            zorder=4,
+            label=f"{corr_name} Mean",
+        )
+
+    min_x, max_x = min(all_severities), max(all_severities)
+    x_pad = (max_x - min_x) * 0.04 if max_x > min_x else 0.01
+
+    # Failure regime and threshold
+    ax.axhspan(0.0, failure_threshold, facecolor="#FF4D2D", alpha=0.10, zorder=2, label="Failure Regime (< 0.80)")
+    ax.axhline(
+        y=failure_threshold,
+        color="#FF4D2D",
+        linestyle="--",
+        linewidth=1.4,
+        alpha=0.9,
+        zorder=2,
+        label=f"Failure Threshold ({failure_threshold:.2f})",
+    )
+
+    ax.set_xlim(min_x - x_pad, max_x + x_pad)
+    ax.set_ylim(0.50, 1.05)
+
+    ax.set_xlabel("Nominal Corruption Severity ($s$)", fontsize=11, fontweight="semibold", color="#F1F5F9", labelpad=8)
+    ax.set_ylabel("Macro-F1 Score", fontsize=11, fontweight="semibold", color="#F1F5F9", labelpad=8)
+    ax.set_title(
+        f"Cross-Corruption Robustness Comparison (RQ2: R=5 Seeds, 95% Student's t CI) — {experiment_id}\n"
+        f"Model: {model_name} | Dataset: {dataset_name}",
+        fontsize=12,
+        fontweight="bold",
+        color="#F8FAFC",
+        pad=12,
+    )
+
+    ax.tick_params(colors="#94A3B8", labelsize=9.5)
+    for spine in ax.spines.values():
+        spine.set_color("#334155")
+        spine.set_linewidth(0.8)
+
+    legend = ax.legend(
+        loc="lower left",
+        facecolor="#111318",
+        edgecolor="#334155",
+        fontsize=8.0,
+        labelcolor="#E2E8F0",
+        ncol=2,
+    )
+    legend.get_frame().set_alpha(0.92)
+
+    fig.text(
+        0.5,
+        0.015,
+        "Observed failure boundary under the specified experimental configuration.",
+        ha="center",
+        fontsize=8.5,
+        fontstyle="italic",
+        color="#64748B",
+    )
+
+    plt.tight_layout(rect=[0, 0.04, 1, 1])
+    plt.savefig(output_path, dpi=300, facecolor=fig.get_facecolor(), edgecolor="none")
+    plt.close(fig)
+
+    return output_path
+
+

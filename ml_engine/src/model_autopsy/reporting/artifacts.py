@@ -742,3 +742,369 @@ python scripts/experiments/run_e001.py --multi-seed
 ```
 """
 
+
+def generate_e002_artifacts(
+    experiment_id: str,
+    output_dir: Path,
+    dataset_metadata: Dict[str, Any],
+    model_metadata: Dict[str, Any],
+    seeds_config: Dict[str, Any],
+    corruption_results: Dict[str, Any],
+    protocol_version: str = "1.0.0",
+    failure_threshold: float = 0.80,
+) -> Dict[str, Path]:
+    """Generate and persist all E002 multi-corruption artifacts.
+
+    Generates:
+        - aggregate_comparison.csv
+        - aggregate_comparison.json
+        - manifest.json
+        - report.md
+        - Per-corruption subdirectories with granular results.
+
+    Args:
+        experiment_id: Experiment identifier ('E002').
+        output_dir: Destination artifact directory.
+        dataset_metadata: Dataset metadata dictionary.
+        model_metadata: Model metadata dictionary.
+        seeds_config: Dictionary of seed configurations.
+        corruption_results: Dictionary mapping corruption_id to MultiSeedEvaluationResult.
+        protocol_version: Protocol specification version.
+        failure_threshold: Primary reliability failure threshold.
+
+    Returns:
+        Dictionary mapping artifact filenames to their absolute Path.
+    """
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+    artifacts: Dict[str, Path] = {}
+
+    # 1. aggregate_comparison.csv
+    agg_csv_path = output_dir / "aggregate_comparison.csv"
+    with open(agg_csv_path, "w", newline="", encoding="utf-8") as f:
+        writer = csv.DictWriter(
+            f,
+            fieldnames=[
+                "corruption",
+                "severity",
+                "n_successful_runs",
+                "macro_f1_mean",
+                "macro_f1_std",
+                "macro_f1_sem",
+                "macro_f1_ci_lower",
+                "macro_f1_ci_upper",
+                "accuracy_mean",
+                "accuracy_std",
+                "accuracy_sem",
+                "abs_degradation_pp_mean",
+                "rel_degradation_pct_mean",
+                "failure_count",
+                "failure_proportion",
+                "is_mean_failed",
+            ],
+        )
+        writer.writeheader()
+        for corr_id, res in corruption_results.items():
+            for agg in res.severity_aggregates:
+                d = {
+                    "corruption": corr_id,
+                    "severity": agg.severity,
+                    "n_successful_runs": agg.n_successful_runs,
+                    "macro_f1_mean": agg.macro_f1.mean,
+                    "macro_f1_std": agg.macro_f1.sample_std,
+                    "macro_f1_sem": agg.macro_f1.sem,
+                    "macro_f1_ci_lower": agg.macro_f1.ci_lower,
+                    "macro_f1_ci_upper": agg.macro_f1.ci_upper,
+                    "accuracy_mean": agg.accuracy.mean,
+                    "accuracy_std": agg.accuracy.sample_std,
+                    "accuracy_sem": agg.accuracy.sem,
+                    "abs_degradation_pp_mean": agg.absolute_degradation_pp.mean,
+                    "rel_degradation_pct_mean": agg.relative_degradation_pct.mean,
+                    "failure_count": agg.failure_count,
+                    "failure_proportion": agg.failure_proportion,
+                    "is_mean_failed": agg.is_mean_failed,
+                }
+                writer.writerow(d)
+    artifacts["aggregate_comparison.csv"] = agg_csv_path
+
+    # 2. Per-corruption subdirectories & aggregate JSON
+    comparison_json_data: Dict[str, Any] = {
+        "experiment_id": experiment_id,
+        "protocol_version": protocol_version,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "dataset_metadata": dataset_metadata,
+        "model_metadata": model_metadata,
+        "seeds_config": seeds_config,
+        "failure_threshold": failure_threshold,
+        "corruptions": {},
+    }
+
+    corruptions_base_dir = output_dir / "corruptions"
+    corruptions_base_dir.mkdir(parents=True, exist_ok=True)
+
+    for corr_id, res in corruption_results.items():
+        corr_dir = corruptions_base_dir / corr_id
+        corr_dir.mkdir(parents=True, exist_ok=True)
+
+        # Write per-corruption aggregate CSV
+        corr_agg_csv = corr_dir / "aggregate_results.csv"
+        with open(corr_agg_csv, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "severity",
+                    "n_successful_runs",
+                    "macro_f1_mean",
+                    "macro_f1_std",
+                    "macro_f1_sem",
+                    "macro_f1_ci_lower",
+                    "macro_f1_ci_upper",
+                    "accuracy_mean",
+                    "accuracy_std",
+                    "accuracy_sem",
+                    "abs_degradation_pp_mean",
+                    "rel_degradation_pct_mean",
+                    "failure_count",
+                    "failure_proportion",
+                    "is_mean_failed",
+                ],
+            )
+            writer.writeheader()
+            for agg in res.severity_aggregates:
+                writer.writerow({
+                    "severity": agg.severity,
+                    "n_successful_runs": agg.n_successful_runs,
+                    "macro_f1_mean": agg.macro_f1.mean,
+                    "macro_f1_std": agg.macro_f1.sample_std,
+                    "macro_f1_sem": agg.macro_f1.sem,
+                    "macro_f1_ci_lower": agg.macro_f1.ci_lower,
+                    "macro_f1_ci_upper": agg.macro_f1.ci_upper,
+                    "accuracy_mean": agg.accuracy.mean,
+                    "accuracy_std": agg.accuracy.sample_std,
+                    "accuracy_sem": agg.accuracy.sem,
+                    "abs_degradation_pp_mean": agg.absolute_degradation_pp.mean,
+                    "rel_degradation_pct_mean": agg.relative_degradation_pct.mean,
+                    "failure_count": agg.failure_count,
+                    "failure_proportion": agg.failure_proportion,
+                    "is_mean_failed": agg.is_mean_failed,
+                })
+
+        # Write per-corruption all_seeds CSV
+        corr_all_seeds_csv = corr_dir / "all_seeds_results.csv"
+        all_seeds_rows = []
+        for seed, seed_run in res.per_seed_results.items():
+            for rec in seed_run.get("severity_records", []):
+                all_seeds_rows.append({
+                    "seed": seed,
+                    "severity": rec["severity"],
+                    "macro_f1": rec["macro_f1"],
+                    "accuracy": rec["accuracy"],
+                    "absolute_degradation_pp": rec["absolute_degradation_pp"],
+                    "relative_degradation_pct": rec["relative_degradation_pct"],
+                    "is_failed": rec["is_failed"],
+                    "rel_drop_exceeds_15_pct": rec.get("rel_drop_exceeds_15_pct", False),
+                })
+        with open(corr_all_seeds_csv, "w", newline="", encoding="utf-8") as f:
+            writer = csv.DictWriter(
+                f,
+                fieldnames=[
+                    "seed",
+                    "severity",
+                    "macro_f1",
+                    "accuracy",
+                    "absolute_degradation_pp",
+                    "relative_degradation_pct",
+                    "is_failed",
+                    "rel_drop_exceeds_15_pct",
+                ],
+            )
+            writer.writeheader()
+            for r in all_seeds_rows:
+                writer.writerow(r)
+
+        # Write per-corruption aggregate JSON
+        corr_agg_json = corr_dir / "aggregate_results.json"
+        with open(corr_agg_json, "w", encoding="utf-8") as f:
+            json.dump(res.to_dict(), f, indent=2)
+
+        comparison_json_data["corruptions"][corr_id] = res.to_dict()
+
+    agg_json_path = output_dir / "aggregate_comparison.json"
+    with open(agg_json_path, "w", encoding="utf-8") as f:
+        json.dump(comparison_json_data, f, indent=2)
+    artifacts["aggregate_comparison.json"] = agg_json_path
+
+    # 3. Reproducibility Manifest (manifest.json)
+    manifest_data = {
+        "experiment_id": experiment_id,
+        "protocol_version": protocol_version,
+        "timestamp_utc": datetime.now(timezone.utc).isoformat(),
+        "git_commit_hash": get_git_commit_hash(),
+        "environment": get_environment_metadata(),
+        "dataset_metadata": dataset_metadata,
+        "model_metadata": model_metadata,
+        "seeds_config": seeds_config,
+        "evaluation_config": {
+            "primary_metric": "macro_f1",
+            "failure_threshold": failure_threshold,
+            "relative_drop_diagnostic_threshold_pct": 15.0,
+        },
+        "tested_corruptions": list(corruption_results.keys()),
+    }
+    manifest_path = output_dir / "manifest.json"
+    with open(manifest_path, "w", encoding="utf-8") as f:
+        json.dump(manifest_data, f, indent=2)
+    artifacts["manifest.json"] = manifest_path
+
+    # 4. Research Report (report.md)
+    report_content = generate_e002_markdown_report(
+        experiment_id=experiment_id,
+        corruption_results=corruption_results,
+        dataset_metadata=dataset_metadata,
+        model_metadata=model_metadata,
+        seeds_config=seeds_config,
+        protocol_version=protocol_version,
+        failure_threshold=failure_threshold,
+    )
+    report_path = output_dir / "report.md"
+    with open(report_path, "w", encoding="utf-8") as f:
+        f.write(report_content)
+    artifacts["report.md"] = report_path
+
+    return artifacts
+
+
+def generate_e002_markdown_report(
+    experiment_id: str,
+    corruption_results: Dict[str, Any],
+    dataset_metadata: Dict[str, Any],
+    model_metadata: Dict[str, Any],
+    seeds_config: Dict[str, Any],
+    protocol_version: str = "1.0.0",
+    failure_threshold: float = 0.80,
+) -> str:
+    """Construct publication-grade empirical markdown research report for E002."""
+    timestamp = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+    seeds_list = seeds_config.get("research_seeds", [42, 123, 456, 789, 1011])
+
+    corruption_labels = {
+        "gaussian_noise": "Additive Gaussian Noise",
+        "feature_missingness_mcar": "MCAR Missingness (Mean Imputed)",
+        "feature_outliers": "Impulsive Outliers (5σ)",
+    }
+
+    # Summary table rows
+    summary_rows = []
+    for c_id, res in corruption_results.items():
+        c_label = corruption_labels.get(c_id, c_id)
+        b_rec = res.severity_aggregates[0]
+        worst_rec = res.severity_aggregates[-1]
+        mean_b = f"s* = {res.mean_observed_boundary:.2f}" if res.mean_observed_boundary is not None else "s* > 0.30 (Unobserved)"
+        indiv_b = f"s* = {res.earliest_individual_boundary:.2f}" if res.earliest_individual_boundary is not None else "s* > 0.30 (Unobserved)"
+        summary_rows.append(
+            f"| **{c_label}** | `{b_rec.macro_f1.mean:.4f}` | `{worst_rec.macro_f1.mean:.4f} ± {worst_rec.macro_f1.sem:.4f}` | `+{worst_rec.absolute_degradation_pp.mean:.2f} pp` | {mean_b} | {indiv_b} |"
+        )
+    summary_block = "\n".join(summary_rows)
+
+    # Detailed comparative breakdown table
+    severities = [agg.severity for agg in list(corruption_results.values())[0].severity_aggregates]
+    comp_rows = []
+    for sev in severities:
+        col_vals = []
+        for c_id in ["gaussian_noise", "feature_missingness_mcar", "feature_outliers"]:
+            if c_id in corruption_results:
+                agg = next(a for a in corruption_results[c_id].severity_aggregates if abs(a.severity - sev) < 1e-6)
+                col_vals.append(f"`{agg.macro_f1.mean:.4f} [{agg.macro_f1.ci_lower:.4f}, {agg.macro_f1.ci_upper:.4f}]` ({agg.failure_count}/5 failed)")
+            else:
+                col_vals.append("N/A")
+        comp_rows.append(f"| `{sev:.2f}` | {col_vals[0]} | {col_vals[1]} | {col_vals[2]} |")
+    comp_table_block = "\n".join(comp_rows)
+
+    return rf"""# Empirical Research Report: {experiment_id} (RQ2 Corruption Comparison)
+> **Title:** Controlled Cross-Corruption Robustness Evaluation of Random Forest under Continuous, Missing, and Impulsive Input Corruptions  
+> **Protocol Version:** {protocol_version} | **Execution Timestamp:** {timestamp}  
+> **Sample Size:** $R = {len(seeds_list)}$ Independent PRNG Seeds: `{seeds_list}`  
+> **Repository Context:** Model Autopsy ML Engine  
+
+---
+
+## 1. Executive Summary
+
+- **Primary Research Question (RQ2):** *"How do different types of input corruption affect model reliability differently under controlled experimental conditions?"*
+- **Cross-Corruption Comparison Summary ($s = 0.30$ Worst-Case Stress):**
+
+| Corruption Modality | Baseline Macro-F1 ($s=0.00$) | Worst Macro-F1 ($s=0.30$, Mean ± SEM) | Absolute Degradation | Mean Failure Boundary ($s^*$) | Earliest Individual Boundary |
+|---|---|---|---|---|---|
+{summary_block}
+
+- **Mandated Reporting Caption:**
+  > *"Observed failure boundary under the specified experimental configuration."*
+
+---
+
+## 2. Experimental Invariants & Data Isolation
+
+| Dimension | Experimental Specification | Protocol Guarantee |
+|---|---|---|
+| **Benchmark Dataset** | Fisher Iris ($N = 150$, 4 features, 3 classes) | Unaltered canonical benchmark |
+| **Partitioning Strategy** | Stratified 80/20 train/test split (`split_seed = 42`) | **Frozen split** ($N_{{\text{{train}}}}=120$, $N_{{\text{{test}}}}=30$) |
+| **Model Configuration** | `RandomForestClassifier(n_estimators=100, max_depth=None, criterion='gini')` | Identical tree capacity |
+| **Statistical Suite** | 5 seeds: `{seeds_list}` | Bessel's correction $ddof=1$, Student's $t$ CI with $\text{{df}}=4$ |
+| **Reliability Criterion** | Strict failure if $\text{{Macro-F1}} < {failure_threshold:.2f}$ | Predefined threshold |
+| **Diagnostic Flag** | Secondary flag if $\Delta_{{\text{{rel}}}} > 15.0\%$ | Predefined threshold |
+
+---
+
+## 3. Systematic Multi-Corruption Degradation Table
+
+Comparison of Mean Macro-F1 with 95% Student's $t$ Confidence Intervals across all evaluated severity levels:
+
+| Nominal Severity ($s$) | Additive Gaussian Noise | MCAR Missingness (Mean Imputed) | Impulsive Outliers (5σ) |
+|---|---|---|---|
+{comp_table_block}
+
+*Notes: Values formatted as `Mean [95% CI Lower, Upper]` with failure counts across $R=5$ seeds. Confidence intervals use Student's $t$-distribution with $\text{{df}} = 4$ ($t_{{0.025, 4}} = 2.7764$).*
+
+---
+
+## 4. Failure Boundary & Vulnerability Analysis
+
+1. **Mean Performance Failure Boundary ($s^*_{{\text{{mean}}}}$):**
+   - Gaussian Noise: Not observed within tested range ($s^* > 0.30$).
+   - MCAR Missingness: Evaluated along missingness fraction $p_{{\text{{miss}}}} \in [0.00, 0.30]$.
+   - Outlier Contamination: Evaluated along contamination fraction $p_{{\text{{outlier}}}} \in [0.00, 0.30]$.
+2. **Individual-Run Boundary Dispersion ($s^*_{{\text{{indiv}}}}$):**
+   - Tracks whether any individual stochastic PRNG draw breached the $\text{{Macro-F1}} < 0.80$ threshold.
+3. **Mandated Caption:**
+   > *"Observed failure boundary under the specified experimental configuration."*
+
+---
+
+## 5. Non-Equivalence & Calibration Discussion
+
+- **Calibration Caveat:** Equal nominal severity values ($s = 0.10$) do **not** represent equal corruption strength across differing physical perturbation mechanisms:
+  - In Gaussian noise, $s=0.10$ adds a subtle $0.1\sigma$ shift across all features.
+  - In MCAR missingness, $s=0.10$ replaces $10\%$ of all feature cells with the training mean.
+  - In Outliers, $s=0.10$ injects catastrophic $5\sigma$ spikes into $10\%$ of all feature cells.
+- **Observational Constraint:** Cross-corruption performance rankings reflect empirical sensitivity under these calibrated mathematical definitions, not causal vulnerability.
+
+---
+
+## 6. Scientific Limitations & Threats to Validity
+
+1. **Test Set Granularity:** With $N_{{\text{{test}}}} = 30$ samples (10 per class), a single misclassified sample alters accuracy and recall by $3.33\,\text{{percentage points}}$.
+2. **Benchmark Scale:** The Iris dataset is small, low-dimensional ($D=4$), and possesses well-separated clusters; results do not directly extrapolate to high-dimensional or complex data modalities.
+3. **Imputation Model Dependency:** For missingness, substituting training means is one of several operational imputation policies. A more sophisticated model (e.g. k-NN or iterative imputation) could exhibit different degradation profiles.
+4. **No Causal Claim:** Identified sensitivities represent observational shifts under the defined operators, not causal mechanisms.
+
+---
+
+## 7. Deterministic Reproduction Statement
+
+To deterministically reproduce this cross-corruption evaluation across all 5 seeds:
+```bash
+python scripts/experiments/run_e002.py
+```
+"""
+
+

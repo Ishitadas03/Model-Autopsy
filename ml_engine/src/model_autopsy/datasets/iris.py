@@ -2,7 +2,7 @@
 
 from dataclasses import dataclass
 import hashlib
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 import numpy as np
 from sklearn.datasets import load_iris
 from sklearn.model_selection import train_test_split
@@ -23,6 +23,7 @@ class IrisSplitBundle:
     train_std: np.ndarray
     dataset_hash: str
     split_seed: int
+    train_mean: Optional[np.ndarray] = None
 
     def __post_init__(self) -> None:
         """Enforce read-only guarantees on arrays."""
@@ -33,6 +34,8 @@ class IrisSplitBundle:
         self.train_indices.flags.writeable = False
         self.test_indices.flags.writeable = False
         self.train_std.flags.writeable = False
+        if self.train_mean is not None:
+            self.train_mean.flags.writeable = False
 
 
 def compute_array_hash(X: np.ndarray, y: np.ndarray) -> str:
@@ -132,10 +135,11 @@ def load_and_validate_iris(
     if not np.all(test_counts == 10):
         raise ValueError(f"Expected 10 samples per class in test set, got {test_counts}")
 
-    # 6. Feature Dispersion: Sample standard deviation calculated strictly on X_train (ddof=1)
+    # 6. Feature Dispersion & Means calculated strictly on X_train (ddof=1)
     train_std = np.std(X_train, axis=0, ddof=1)
     if np.any(train_std <= 0):
         raise ValueError("Calculated zero or negative standard deviation on training features")
+    train_mean = np.mean(X_train, axis=0)
 
     return IrisSplitBundle(
         X_train=X_train,
@@ -149,4 +153,5 @@ def load_and_validate_iris(
         train_std=train_std,
         dataset_hash=dataset_hash,
         split_seed=split_seed,
+        train_mean=train_mean,
     )

@@ -1,0 +1,81 @@
+{
+  "experiment_id": "E002",
+  "protocol_version": "1.0.0",
+  "timestamp_utc": "2026-10-25T08:56:43.495620+00:00",
+  "git_commit_hash": "60a59649e87f5dffad6eed478135f13506135dc4",
+  "environment": {
+    "python_version": "3.13.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "os_system": "Windows",
+    "architecture": "AMD64",
+    "package_versions": {
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "scikit-learn": "1.9.0",
+      "pandas": "2.3.3",
+      "matplotlib": "3.10.8",
+      "pydantic": "2.12.4",
+      "pyyaml": "6.0.3"
+    }
+  },
+  "dataset_metadata": {
+    "name": "iris",
+    "n_total": 150,
+    "n_train": 120,
+    "n_test": 30,
+    "feature_names": [
+      "sepal length (cm)",
+      "sepal width (cm)",
+      "petal length (cm)",
+      "petal width (cm)"
+    ],
+    "target_names": [
+      "setosa",
+      "versicolor",
+      "virginica"
+    ],
+    "feature_sigmas": [
+      0.840926,
+      0.448524,
+      1.76852,
+      0.762663
+    ],
+    "feature_means": [
+      5.841667,
+      3.048333,
+      3.77,
+      1.205
+    ],
+    "dataset_hash": "aa06b8008ceba42efc654be0f83fdafc786239c9e8f13146044d078f5aab8f23",
+    "split_seed": 42
+  },
+  "model_metadata": {
+    "family": "RandomForestClassifier",
+    "n_estimators": 100,
+    "max_depth": null,
+    "criterion": "gini",
+    "min_samples_split": 2,
+    "min_samples_leaf": 1,
+    "bootstrap": true
+  },
+  "seeds_config": {
+    "split_seed": 42,
+    "research_seeds": [
+      42,
+      123,
+      456,
+      789,
+      1011
+    ]
+  },
+  "evaluation_config": {
+    "primary_metric": "macro_f1",
+    "failure_threshold": 0.8,
+    "relative_drop_diagnostic_threshold_pct": 15.0
+  },
+  "tested_corruptions": [
+    "gaussian_noise",
+    "feature_missingness_mcar",
+    "feature_outliers"
+  ]
+}

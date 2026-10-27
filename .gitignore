@@ -63,6 +63,7 @@ artifacts/*
 # IDE & Editors
 .vscode/
 .idea/
+.kilo/
 *.swp
 *.swo
 *~

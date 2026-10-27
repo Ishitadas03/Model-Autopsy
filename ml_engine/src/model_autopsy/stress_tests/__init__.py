@@ -9,6 +9,14 @@ from model_autopsy.stress_tests.feature_corruption.single_feature import (
     apply_single_feature_outliers,
 )
 
+from model_autopsy.stress_tests.distribution_shift.covariate import (
+    DIRECTION_VECTORS,
+    TrainDistributionParameters,
+    apply_directional_covariate_shift,
+    apply_dispersion_covariate_shift,
+    compute_selection_shift_weights,
+)
+
 __all__ = [
     "PerturbationResult",
     "apply_gaussian_noise",
@@ -17,4 +25,9 @@ __all__ = [
     "apply_single_feature_gaussian_noise",
     "apply_single_feature_missingness",
     "apply_single_feature_outliers",
+    "DIRECTION_VECTORS",
+    "TrainDistributionParameters",
+    "apply_directional_covariate_shift",
+    "apply_dispersion_covariate_shift",
+    "compute_selection_shift_weights",
 ]

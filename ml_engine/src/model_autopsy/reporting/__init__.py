@@ -9,6 +9,8 @@ from model_autopsy.reporting.artifacts import (
     generate_e004_markdown_report,
     generate_e005_artifacts,
     generate_e005_markdown_report,
+    generate_e006_artifacts,
+    generate_e006_markdown_report,
     generate_multiseed_artifacts,
     get_environment_metadata,
     get_git_commit_hash,
@@ -24,6 +26,8 @@ __all__ = [
     "generate_e004_markdown_report",
     "generate_e005_artifacts",
     "generate_e005_markdown_report",
+    "generate_e006_artifacts",
+    "generate_e006_markdown_report",
     "get_environment_metadata",
     "get_git_commit_hash",
 ]

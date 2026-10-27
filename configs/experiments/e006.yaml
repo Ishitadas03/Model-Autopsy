@@ -1,0 +1,96 @@
+experiment:
+  id: "E006"
+  name: "Empirical Robustness and Boundary Characterization Under Systematic Distribution Shift"
+  protocol_version: "1.0.0"
+  description: "Preregistered empirical investigation of systematic distribution shift (RQ6) evaluating model robustness under directional affine translations, dispersion inflation, and selection bias across Random Forest, Logistic Regression, and Gradient Boosted Trees."
+
+dataset:
+  name: "iris"
+  source: "sklearn.datasets.load_iris"
+  task_type: "multiclass_classification"
+  n_instances: 150
+  n_features: 4
+  n_classes: 3
+  split:
+    method: "stratified_random"
+    train_ratio: 0.80
+    test_ratio: 0.20
+    split_seed: 42
+
+models:
+  random_forest:
+    family: "ensemble"
+    adapter: "sklearn_rf"
+    class_name: "RandomForestClassifier"
+    preprocessing: "none"
+    hyperparameters:
+      n_estimators: 100
+      max_depth: null
+      criterion: "gini"
+      min_samples_split: 2
+      min_samples_leaf: 1
+      bootstrap: true
+  logistic_regression:
+    family: "linear"
+    adapter: "sklearn_logistic"
+    class_name: "LogisticRegression"
+    preprocessing: "standard_scaler"
+    hyperparameters:
+      penalty: "l2"
+      C: 1.0
+      solver: "lbfgs"
+      max_iter: 1000
+  gradient_boosting:
+    family: "boosting"
+    adapter: "sklearn_gb"
+    class_name: "GradientBoostingClassifier"
+    preprocessing: "none"
+    hyperparameters:
+      n_estimators: 100
+      learning_rate: 0.1
+      max_depth: 3
+      subsample: 1.0
+      criterion: "friedman_mse"
+
+seeds:
+  split_seed: 42
+  dev_seed: 42
+  research_seeds: [42, 123, 456, 789, 1011]
+
+stress_tests:
+  severities: [0.00, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30]
+  shift_regimes:
+    directional_allometric:
+      type: "directional_translation"
+      direction: "allometric"
+      vector: [0.5, 0.5, 0.5, 0.5]
+      parameter_source: "train_only"
+    directional_petal_pos:
+      type: "directional_translation"
+      direction: "petal_pos"
+      vector: [0.0, 0.0, 0.70710678, 0.70710678]
+      parameter_source: "train_only"
+    directional_petal_neg:
+      type: "directional_translation"
+      direction: "petal_neg"
+      vector: [0.0, 0.0, -0.70710678, -0.70710678]
+      parameter_source: "train_only"
+    dispersion_dilation:
+      type: "dispersion_inflation"
+      centroid_source: "train_mean"
+      parameter_source: "train_only"
+    selection_bias:
+      type: "selection_weighting"
+      projection: "train_pc1"
+      parameter_source: "train_only"
+
+evaluation:
+  primary_metric: "macro_f1"
+  secondary_metrics: ["accuracy", "delta_abs", "delta_rel", "audc"]
+  failure_threshold: 0.80
+  strict_comparison: true
+  fdr_q_threshold: 0.05
+
+artifacts:
+  output_dir: "artifacts/experiments/E006"
+  generate_plot: true

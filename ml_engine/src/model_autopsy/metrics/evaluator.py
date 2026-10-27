@@ -32,6 +32,7 @@ def calculate_metrics(
     baseline_macro_f1: Optional[float] = None,
     failure_threshold: float = 0.80,
     n_classes: int = 3,
+    sample_weight: Optional[np.ndarray] = None,
 ) -> EvaluationMetrics:
     """Compute primary, secondary, and degradation metrics for predictions.
 
@@ -60,6 +61,7 @@ def calculate_metrics(
             If None, current_macro_f1 is treated as the baseline.
         failure_threshold: Fixed reliability threshold (default 0.80).
         n_classes: Total number of categorical classes (default 3).
+        sample_weight: Optional non-negative sample weights (n_samples,).
 
     Returns:
         EvaluationMetrics instance.
@@ -72,22 +74,23 @@ def calculate_metrics(
         raise ValueError("Cannot calculate metrics on an empty array")
 
     # Primary metric
-    raw_macro_f1 = float(f1_score(y_true, y_pred, average="macro", zero_division=0))
+    raw_macro_f1 = float(f1_score(y_true, y_pred, average="macro", sample_weight=sample_weight, zero_division=0))
     macro_f1 = round(raw_macro_f1, 4)
 
     # Secondary metrics
-    accuracy = round(float(accuracy_score(y_true, y_pred)), 4)
+    accuracy = round(float(accuracy_score(y_true, y_pred, sample_weight=sample_weight)), 4)
 
     # Per-class precision, recall, F1
     precision, recall, f1, _ = precision_recall_fscore_support(
         y_true,
         y_pred,
         labels=list(range(n_classes)),
+        sample_weight=sample_weight,
         zero_division=0,
     )
 
     # Confusion matrix
-    cm = confusion_matrix(y_true, y_pred, labels=list(range(n_classes)))
+    cm = confusion_matrix(y_true, y_pred, labels=list(range(n_classes)), sample_weight=sample_weight)
 
     # Degradation metrics calculation
     ref_baseline = macro_f1 if baseline_macro_f1 is None else baseline_macro_f1

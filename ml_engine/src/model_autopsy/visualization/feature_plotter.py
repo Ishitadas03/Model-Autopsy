@@ -117,8 +117,8 @@ def plot_e005_feature_vulnerability(
     )
     plt.tight_layout()
     curve_path = figures_dir / "feature_degradation_curves.png"
-    plt.savefig(curve_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    fig.savefig(curve_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
     generated_paths["feature_degradation_curves"] = curve_path
 
     # =========================================================================
@@ -174,8 +174,8 @@ def plot_e005_feature_vulnerability(
 
     plt.tight_layout()
     bar_path = figures_dir / "feature_vulnerability_bars.png"
-    plt.savefig(bar_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    fig.savefig(bar_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
     generated_paths["feature_vulnerability_bars"] = bar_path
 
     # =========================================================================
@@ -236,8 +236,9 @@ def plot_e005_feature_vulnerability(
 
     plt.tight_layout()
     scatter_path = figures_dir / "clean_vs_vulnerability_scatter.png"
-    plt.savefig(scatter_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    fig.savefig(scatter_path, dpi=300, bbox_inches="tight")
+    plt.close(fig)
+    plt.close("all")
     generated_paths["clean_vs_vulnerability_scatter"] = scatter_path
 
     return generated_paths

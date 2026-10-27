@@ -7,6 +7,15 @@ from model_autopsy.analysis.failure_boundary import (
     compute_feature_vulnerabilities,
     detect_failure_boundary,
 )
+from model_autopsy.analysis.feature_vulnerability import (
+    assign_ranks,
+    calculate_audc,
+    compute_clean_importance_correlation,
+    compute_feature_rankings,
+    compute_friedman_test,
+    compute_pairwise_feature_tests,
+    compute_rank_concordance,
+)
 from model_autopsy.analysis.statistical import (
     MultiSeedEvaluationResult,
     SampleStatistics,
@@ -26,4 +35,11 @@ __all__ = [
     "MultiSeedEvaluationResult",
     "compute_sample_statistics",
     "aggregate_multi_seed_results",
+    "calculate_audc",
+    "assign_ranks",
+    "compute_feature_rankings",
+    "compute_friedman_test",
+    "compute_pairwise_feature_tests",
+    "compute_rank_concordance",
+    "compute_clean_importance_correlation",
 ]

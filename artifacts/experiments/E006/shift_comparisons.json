@@ -1,0 +1,116 @@
+{
+  "experiment_id": "E006",
+  "protocol_version": "1.0.0",
+  "hypothesis_tests": {
+    "h1_friedman": {
+      "test": "Friedman Omnibus Test",
+      "statistic": 7.6,
+      "p_value": 0.022371,
+      "degrees_of_freedom": 2,
+      "n_seeds": 5,
+      "null_rejected": true
+    },
+    "h1_pairwise_comparisons": [
+      {
+        "model_1": "logistic_regression",
+        "model_2": "gradient_boosting",
+        "mean_diff": -13.65,
+        "t_statistic": -Infinity,
+        "raw_p_value": 0.0,
+        "adjusted_p_value": 0.0,
+        "significant": true
+      },
+      {
+        "model_1": "random_forest",
+        "model_2": "logistic_regression",
+        "mean_diff": 15.046,
+        "t_statistic": 7.1245,
+        "raw_p_value": 0.0020518604529422882,
+        "adjusted_p_value": 0.003078,
+        "significant": true
+      },
+      {
+        "model_1": "random_forest",
+        "model_2": "gradient_boosting",
+        "mean_diff": 1.396,
+        "t_statistic": 0.661,
+        "raw_p_value": 0.5447286408689019,
+        "adjusted_p_value": 0.544729,
+        "significant": false
+      }
+    ],
+    "h2_asymmetry": {
+      "test": "Paired Directional Asymmetry Test (H2)",
+      "mean_positive_drop": 9.6253,
+      "mean_negative_drop": 5.9187,
+      "mean_difference": 3.7067,
+      "t_statistic": 2.0933,
+      "p_value": 0.055015,
+      "null_rejected": false
+    },
+    "h3_shift_vs_noise": {
+      "test": "Paired Shift vs Noise AUDC Test (H3)",
+      "mean_shift_audc": 0.2684,
+      "mean_noise_audc": 0.5538,
+      "mean_difference": -0.2854,
+      "t_statistic": -1.2873,
+      "p_value": 0.218873,
+      "null_rejected": false
+    },
+    "h4_dispersion_vs_translation": {
+      "test": "Translation vs Dispersion AUDC Test (H4)",
+      "mean_translation_audc": 0.2684,
+      "mean_dispersion_audc": -0.3608,
+      "mean_difference": 0.6292,
+      "t_statistic": 6.7869,
+      "p_value": 9e-06,
+      "null_rejected": true
+    }
+  },
+  "audc_summary": {
+    "random_forest": {
+      "directional_allometric": -0.2897,
+      "directional_petal_pos": 0.4351,
+      "directional_petal_neg": 0.2802,
+      "dispersion_dilation": -0.4236,
+      "selection_bias": 0.192
+    },
+    "logistic_regression": {
+      "directional_allometric": -0.9158,
+      "directional_petal_pos": -0.6615,
+      "directional_petal_neg": 0.4565,
+      "dispersion_dilation": -0.831,
+      "selection_bias": 0.218
+    },
+    "gradient_boosting": {
+      "directional_allometric": 0.8397,
+      "directional_petal_pos": 1.0317,
+      "directional_petal_neg": 0.0968,
+      "dispersion_dilation": 0.1722,
+      "selection_bias": 0.1105
+    }
+  },
+  "failure_boundaries": {
+    "random_forest": {
+      "directional_allometric": null,
+      "directional_petal_pos": 0.3,
+      "directional_petal_neg": null,
+      "dispersion_dilation": null,
+      "selection_bias": null
+    },
+    "logistic_regression": {
+      "directional_allometric": null,
+      "directional_petal_pos": null,
+      "directional_petal_neg": null,
+      "dispersion_dilation": null,
+      "selection_bias": null
+    },
+    "gradient_boosting": {
+      "directional_allometric": null,
+      "directional_petal_pos": null,
+      "directional_petal_neg": null,
+      "dispersion_dilation": null,
+      "selection_bias": null
+    }
+  }
+}

@@ -1,0 +1,53 @@
+{
+  "experiment_id": "E006",
+  "protocol_version": "1.0.0",
+  "git_commit_hash": "74022fb13a3c40cd5adbe3bd3186817abf7a6a73",
+  "generated_at_utc": "2026-10-27T15:32:24.057812+00:00",
+  "environment": {
+    "python_version": "3.13.5",
+    "platform": "Windows-11-10.0.26200-SP0",
+    "os_system": "Windows",
+    "architecture": "AMD64",
+    "package_versions": {
+      "numpy": "2.3.5",
+      "scipy": "1.17.1",
+      "scikit-learn": "1.9.0",
+      "pandas": "2.3.3",
+      "matplotlib": "3.10.8",
+      "pydantic": "2.12.4",
+      "pyyaml": "6.0.3"
+    }
+  },
+  "seeds": {
+    "split_seed": 42,
+    "research_seeds": [
+      42,
+      123,
+      456,
+      789,
+      1011
+    ]
+  },
+  "dataset_metadata": {
+    "name": "iris",
+    "n_instances": 150,
+    "n_features": 4,
+    "n_classes": 3,
+    "split": {
+      "method": "stratified_random",
+      "train_ratio": 0.8,
+      "test_ratio": 0.2,
+      "split_seed": 42
+    }
+  },
+  "artifacts_generated": [
+    "metrics.json",
+    "shift_summary.csv",
+    "shift_comparisons.json",
+    "reproducibility_manifest.json",
+    "report.md",
+    "figures/covariate_shift_curves.png",
+    "figures/directional_asymmetry_bars.png",
+    "figures/shift_vs_corruption_comparison.png"
+  ]
+}

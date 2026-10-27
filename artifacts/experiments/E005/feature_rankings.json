@@ -1,0 +1,1653 @@
+{
+  "experiment_id": "E005",
+  "protocol_version": "1.0.0",
+  "generated_at": "2026-10-27T14:43:15.412437+00:00",
+  "primary_operator": "single_feature_gaussian_noise",
+  "models": {
+    "random_forest": {
+      "clean_macro_f1_mean": 0.9265,
+      "operators": {
+        "single_feature_gaussian_noise": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.0822,
+              "sem": 0.0135,
+              "ci95_low": 0.0449,
+              "ci95_high": 0.1196,
+              "audc": 0.0105,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.0609,
+              "sem": 0.0245,
+              "ci95_low": -0.0071,
+              "ci95_high": 0.1289,
+              "audc": 0.0072,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.0134,
+              "sem": 0.0082,
+              "ci95_low": -0.0094,
+              "ci95_high": 0.0361,
+              "audc": 0.0054,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.0105,
+              "sem": 0.0026,
+              "terminal_delta": 0.0822,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0072,
+              "sem": 0.0031,
+              "terminal_delta": 0.0609,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0054,
+              "sem": 0.0022,
+              "terminal_delta": 0.0134,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "friedman_test": {
+            "statistic": 11.651163,
+            "p_value": 0.008679,
+            "is_significant": true,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": -0.01338,
+              "statistic": 0.0,
+              "raw_p": 0.5,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 0.6,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.08224,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.06088,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": -0.06886,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.0475,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": 0.02136,
+              "statistic": 3.0,
+              "raw_p": 0.625,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 0.625,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.6667,
+            "kendall_p": 0.3333,
+            "spearman_rho": 0.8,
+            "spearman_p": 0.2
+          }
+        },
+        "single_feature_missingness": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.0448,
+              "sem": 0.0296,
+              "ci95_low": -0.0373,
+              "ci95_high": 0.1269,
+              "audc": 0.0084,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.0195,
+              "sem": 0.0195,
+              "ci95_low": -0.0346,
+              "ci95_high": 0.0736,
+              "audc": 0.0031,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.0067,
+              "sem": 0.0067,
+              "ci95_low": -0.0118,
+              "ci95_high": 0.0252,
+              "audc": 0.0008,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0084,
+              "sem": 0.0055,
+              "terminal_delta": 0.0448,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.0031,
+              "sem": 0.0031,
+              "terminal_delta": 0.0195,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0008,
+              "sem": 0.0008,
+              "terminal_delta": 0.0067,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "friedman_test": {
+            "statistic": 7.0,
+            "p_value": 0.071898,
+            "is_significant": false,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": -0.00666,
+              "statistic": 0.0,
+              "raw_p": 1.0,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 1.0,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.01948,
+              "statistic": 0.0,
+              "raw_p": 1.0,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 1.0,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.04482,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.75,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": -0.01282,
+              "statistic": 0.0,
+              "raw_p": 1.0,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 1.0,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.03816,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.75,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": -0.02534,
+              "statistic": 3.0,
+              "raw_p": 0.625,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 1.0,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.3333,
+            "kendall_p": 0.75,
+            "spearman_rho": 0.6,
+            "spearman_p": 0.4
+          }
+        },
+        "single_feature_outliers": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.1039,
+              "sem": 0.0366,
+              "ci95_low": 0.0023,
+              "ci95_high": 0.2055,
+              "audc": 0.0137,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.0829,
+              "sem": 0.0321,
+              "ci95_low": -0.0061,
+              "ci95_high": 0.172,
+              "audc": 0.0109,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.0067,
+              "sem": 0.0067,
+              "ci95_low": -0.0118,
+              "ci95_high": 0.0252,
+              "audc": 0.0008,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.0137,
+              "sem": 0.005,
+              "terminal_delta": 0.1039,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0109,
+              "sem": 0.0038,
+              "terminal_delta": 0.0829,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0008,
+              "sem": 0.0008,
+              "terminal_delta": 0.0067,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "friedman_test": {
+            "statistic": 10.833333,
+            "p_value": 0.012662,
+            "is_significant": true,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": -0.00666,
+              "statistic": 0.0,
+              "raw_p": 1.0,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 1.0,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.10392,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.08292,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": -0.09726,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.07626,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": 0.021,
+              "statistic": 2.0,
+              "raw_p": 0.75,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 0.9,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.6667,
+            "kendall_p": 0.3333,
+            "spearman_rho": 0.8,
+            "spearman_p": 0.2
+          }
+        }
+      }
+    },
+    "logistic_regression": {
+      "clean_macro_f1_mean": 0.9333,
+      "operators": {
+        "single_feature_gaussian_noise": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.0273,
+              "sem": 0.0166,
+              "ci95_low": -0.0188,
+              "ci95_high": 0.0734,
+              "audc": 0.0054,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.0269,
+              "sem": 0.0195,
+              "ci95_low": -0.0272,
+              "ci95_high": 0.081,
+              "audc": 0.0037,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 3.5
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 3.5
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0054,
+              "sem": 0.0034,
+              "terminal_delta": 0.0273,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.0037,
+              "sem": 0.0021,
+              "terminal_delta": 0.0269,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 3.5
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 3.5
+            }
+          ],
+          "friedman_test": {
+            "statistic": 8.307692,
+            "p_value": 0.040063,
+            "is_significant": true,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": 0.0,
+              "statistic": 0.0,
+              "raw_p": 1.0,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 1.0,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.02692,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.02732,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": -0.02692,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.02732,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": -0.0004,
+              "statistic": 1.0,
+              "raw_p": 1.0,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 1.0,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.9129,
+            "kendall_p": 0.071,
+            "spearman_rho": 0.9487,
+            "spearman_p": 0.0513
+          }
+        },
+        "single_feature_missingness": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.0633,
+              "sem": 0.0141,
+              "ci95_low": 0.0241,
+              "ci95_high": 0.1024,
+              "audc": 0.0075,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.0424,
+              "sem": 0.0133,
+              "ci95_low": 0.0055,
+              "ci95_high": 0.0794,
+              "audc": 0.0056,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.0343,
+              "sem": 0.0107,
+              "ci95_low": 0.0047,
+              "ci95_high": 0.0639,
+              "audc": 0.005,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0075,
+              "sem": 0.0015,
+              "terminal_delta": 0.0633,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0056,
+              "sem": 0.0017,
+              "terminal_delta": 0.0424,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.005,
+              "sem": 0.0016,
+              "terminal_delta": 0.0343,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "friedman_test": {
+            "statistic": 9.913043,
+            "p_value": 0.01932,
+            "is_significant": true,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": -0.04244,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 0.25,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.03428,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.06326,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": 0.00816,
+              "statistic": 5.0,
+              "raw_p": 0.625,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 0.625,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.02082,
+              "statistic": 4.0,
+              "raw_p": 0.375,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 0.5625,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": -0.02898,
+              "statistic": 0.0,
+              "raw_p": 0.5,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 0.6,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.3333,
+            "kendall_p": 0.75,
+            "spearman_rho": 0.4,
+            "spearman_p": 0.6
+          }
+        },
+        "single_feature_outliers": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.1912,
+              "sem": 0.0393,
+              "ci95_low": 0.082,
+              "ci95_high": 0.3004,
+              "audc": 0.0247,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.1677,
+              "sem": 0.0319,
+              "ci95_low": 0.0792,
+              "ci95_high": 0.2563,
+              "audc": 0.0222,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.1396,
+              "sem": 0.0269,
+              "ci95_low": 0.065,
+              "ci95_high": 0.2142,
+              "audc": 0.018,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.127,
+              "sem": 0.016,
+              "ci95_low": 0.0826,
+              "ci95_high": 0.1715,
+              "audc": 0.0218,
+              "rank": 4.0
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.0247,
+              "sem": 0.0048,
+              "terminal_delta": 0.1912,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0222,
+              "sem": 0.0038,
+              "terminal_delta": 0.1677,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0218,
+              "sem": 0.003,
+              "terminal_delta": 0.127,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.018,
+              "sem": 0.0043,
+              "terminal_delta": 0.1396,
+              "rank": 4.0
+            }
+          ],
+          "friedman_test": {
+            "statistic": 6.6875,
+            "p_value": 0.082554,
+            "is_significant": false,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": 0.01258,
+              "statistic": 6.0,
+              "raw_p": 0.8125,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 0.8125,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.05158,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.25,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.02812,
+              "statistic": 1.0,
+              "raw_p": 0.125,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.25,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": -0.06416,
+              "statistic": 2.0,
+              "raw_p": 0.1875,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 0.28125,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.0407,
+              "statistic": 3.0,
+              "raw_p": 0.3125,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": 0.02346,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 0.25,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.6667,
+            "kendall_p": 0.3333,
+            "spearman_rho": 0.8,
+            "spearman_p": 0.2
+          }
+        }
+      }
+    },
+    "gradient_boosting": {
+      "clean_macro_f1_mean": 0.9666,
+      "operators": {
+        "single_feature_gaussian_noise": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.0899,
+              "sem": 0.0087,
+              "ci95_low": 0.0657,
+              "ci95_high": 0.1141,
+              "audc": 0.0122,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.0474,
+              "sem": 0.0203,
+              "ci95_low": -0.0089,
+              "ci95_high": 0.1038,
+              "audc": 0.0062,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.0267,
+              "sem": 0.0125,
+              "ci95_low": -0.008,
+              "ci95_high": 0.0614,
+              "audc": 0.0073,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.0122,
+              "sem": 0.0019,
+              "terminal_delta": 0.0899,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0073,
+              "sem": 0.0034,
+              "terminal_delta": 0.0267,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0062,
+              "sem": 0.0033,
+              "terminal_delta": 0.0474,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "friedman_test": {
+            "statistic": 10.568182,
+            "p_value": 0.014305,
+            "is_significant": true,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": -0.0267,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 0.3,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.08992,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.04742,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 0.3,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": -0.06322,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.1875,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.02072,
+              "statistic": 2.5,
+              "raw_p": 0.5,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 0.5,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": 0.0425,
+              "statistic": 1.5,
+              "raw_p": 0.1875,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 0.3,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.6667,
+            "kendall_p": 0.3333,
+            "spearman_rho": 0.8,
+            "spearman_p": 0.2
+          }
+        },
+        "single_feature_missingness": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.1105,
+              "sem": 0.0351,
+              "ci95_low": 0.0131,
+              "ci95_high": 0.2079,
+              "audc": 0.0181,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.0459,
+              "sem": 0.0245,
+              "ci95_low": -0.0221,
+              "ci95_high": 0.114,
+              "audc": 0.0048,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.02,
+              "sem": 0.0082,
+              "ci95_low": -0.0027,
+              "ci95_high": 0.0426,
+              "audc": 0.0028,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.0181,
+              "sem": 0.0055,
+              "terminal_delta": 0.1105,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0048,
+              "sem": 0.0028,
+              "terminal_delta": 0.0459,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0028,
+              "sem": 0.0014,
+              "terminal_delta": 0.02,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "friedman_test": {
+            "statistic": 9.225,
+            "p_value": 0.026444,
+            "is_significant": true,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": -0.01998,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.11052,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.04592,
+              "statistic": 0.0,
+              "raw_p": 0.25,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": -0.09054,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.02594,
+              "statistic": 0.0,
+              "raw_p": 0.5,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 0.5,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": 0.0646,
+              "statistic": 3.0,
+              "raw_p": 0.3125,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 0.375,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.6667,
+            "kendall_p": 0.3333,
+            "spearman_rho": 0.8,
+            "spearman_p": 0.2
+          }
+        },
+        "single_feature_outliers": {
+          "terminal_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "delta_abs_mean": 0.1637,
+              "sem": 0.0433,
+              "ci95_low": 0.0434,
+              "ci95_high": 0.284,
+              "audc": 0.0223,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "delta_abs_mean": 0.0893,
+              "sem": 0.0285,
+              "ci95_low": 0.0102,
+              "ci95_high": 0.1684,
+              "audc": 0.0101,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "delta_abs_mean": 0.0133,
+              "sem": 0.0082,
+              "ci95_low": -0.0093,
+              "ci95_high": 0.036,
+              "audc": 0.0023,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "delta_abs_mean": 0.0,
+              "sem": 0.0,
+              "ci95_low": 0.0,
+              "ci95_high": 0.0,
+              "audc": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "audc_rankings": [
+            {
+              "feature_name": "petal length (cm)",
+              "feature_index": 2,
+              "audc_mean": 0.0223,
+              "sem": 0.0057,
+              "terminal_delta": 0.1637,
+              "rank": 1.0
+            },
+            {
+              "feature_name": "petal width (cm)",
+              "feature_index": 3,
+              "audc_mean": 0.0101,
+              "sem": 0.0028,
+              "terminal_delta": 0.0893,
+              "rank": 2.0
+            },
+            {
+              "feature_name": "sepal width (cm)",
+              "feature_index": 1,
+              "audc_mean": 0.0023,
+              "sem": 0.0015,
+              "terminal_delta": 0.0133,
+              "rank": 3.0
+            },
+            {
+              "feature_name": "sepal length (cm)",
+              "feature_index": 0,
+              "audc_mean": 0.0,
+              "sem": 0.0,
+              "terminal_delta": 0.0,
+              "rank": 4.0
+            }
+          ],
+          "friedman_test": {
+            "statistic": 13.772727,
+            "p_value": 0.003231,
+            "is_significant": true,
+            "df": 3,
+            "n_seeds": 5,
+            "n_features": 4
+          },
+          "pairwise_comparisons": [
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "sepal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 1,
+              "mean_diff": -0.01332,
+              "statistic": 0.0,
+              "raw_p": 0.5,
+              "rank": 6,
+              "bh_critical_threshold": 0.05,
+              "adjusted_p": 0.5,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 2,
+              "mean_diff": -0.1637,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 1,
+              "bh_critical_threshold": 0.008333,
+              "adjusted_p": 0.125,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 0,
+              "feature_index_b": 3,
+              "mean_diff": -0.08928,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 4,
+              "bh_critical_threshold": 0.033333,
+              "adjusted_p": 0.15,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal length (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 2,
+              "mean_diff": -0.15038,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 2,
+              "bh_critical_threshold": 0.016667,
+              "adjusted_p": 0.125,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "sepal width (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 1,
+              "feature_index_b": 3,
+              "mean_diff": -0.07596,
+              "statistic": 0.0,
+              "raw_p": 0.125,
+              "rank": 5,
+              "bh_critical_threshold": 0.041667,
+              "adjusted_p": 0.15,
+              "is_significant_fdr": false
+            },
+            {
+              "feature_a": "petal length (cm)",
+              "feature_b": "petal width (cm)",
+              "feature_index_a": 2,
+              "feature_index_b": 3,
+              "mean_diff": 0.07442,
+              "statistic": 0.0,
+              "raw_p": 0.0625,
+              "rank": 3,
+              "bh_critical_threshold": 0.025,
+              "adjusted_p": 0.125,
+              "is_significant_fdr": false
+            }
+          ],
+          "clean_importance_correlation": {
+            "kendall_tau": 0.6667,
+            "kendall_p": 0.3333,
+            "spearman_rho": 0.8,
+            "spearman_p": 0.2
+          }
+        }
+      }
+    }
+  },
+  "inter_model_concordance": {
+    "random_forest_vs_logistic_regression": {
+      "kendall_tau": 0.9129,
+      "kendall_p": 0.071,
+      "spearman_rho": 0.9487,
+      "spearman_p": 0.0513
+    },
+    "random_forest_vs_gradient_boosting": {
+      "kendall_tau": 1.0,
+      "kendall_p": 0.0833,
+      "spearman_rho": 1.0,
+      "spearman_p": 0.0
+    },
+    "logistic_regression_vs_gradient_boosting": {
+      "kendall_tau": 0.9129,
+      "kendall_p": 0.071,
+      "spearman_rho": 0.9487,
+      "spearman_p": 0.0513
+    }
+  },
+  "modality_concordance": {
+    "random_forest": {
+      "noise_vs_missingness": {
+        "kendall_tau": 1.0,
+        "kendall_p": 0.0833,
+        "spearman_rho": 1.0,
+        "spearman_p": 0.0
+      },
+      "noise_vs_outliers": {
+        "kendall_tau": 1.0,
+        "kendall_p": 0.0833,
+        "spearman_rho": 1.0,
+        "spearman_p": 0.0
+      },
+      "missingness_vs_outliers": {
+        "kendall_tau": 1.0,
+        "kendall_p": 0.0833,
+        "spearman_rho": 1.0,
+        "spearman_p": 0.0
+      }
+    },
+    "logistic_regression": {
+      "noise_vs_missingness": {
+        "kendall_tau": 0.9129,
+        "kendall_p": 0.071,
+        "spearman_rho": 0.9487,
+        "spearman_p": 0.0513
+      },
+      "noise_vs_outliers": {
+        "kendall_tau": 0.9129,
+        "kendall_p": 0.071,
+        "spearman_rho": 0.9487,
+        "spearman_p": 0.0513
+      },
+      "missingness_vs_outliers": {
+        "kendall_tau": 1.0,
+        "kendall_p": 0.0833,
+        "spearman_rho": 1.0,
+        "spearman_p": 0.0
+      }
+    },
+    "gradient_boosting": {
+      "noise_vs_missingness": {
+        "kendall_tau": 1.0,
+        "kendall_p": 0.0833,
+        "spearman_rho": 1.0,
+        "spearman_p": 0.0
+      },
+      "noise_vs_outliers": {
+        "kendall_tau": 1.0,
+        "kendall_p": 0.0833,
+        "spearman_rho": 1.0,
+        "spearman_p": 0.0
+      },
+      "missingness_vs_outliers": {
+        "kendall_tau": 1.0,
+        "kendall_p": 0.0833,
+        "spearman_rho": 1.0,
+        "spearman_p": 0.0
+      }
+    }
+  }
+}

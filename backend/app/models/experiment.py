@@ -22,6 +22,8 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from backend.app.core.database import Base
 
 if TYPE_CHECKING:
+    from backend.app.models.dataset import Dataset
+    from backend.app.models.model_adapter import ModelAdapter
     from backend.app.models.failure_sample import FailedSample
     from backend.app.models.artifact import ArtifactManifest, ArtifactReference
 
@@ -99,6 +101,8 @@ class Experiment(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
+    dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="experiments")
+    model_adapter: Mapped["ModelAdapter"] = relationship("ModelAdapter", back_populates="experiments")
     runs: Mapped[list["ExperimentRun"]] = relationship(
         "ExperimentRun", back_populates="experiment", cascade="all, delete-orphan"
     )

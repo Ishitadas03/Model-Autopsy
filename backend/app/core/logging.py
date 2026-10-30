@@ -62,16 +62,27 @@ def setup_logging() -> None:
     })
 
 
+class RequestContextFilter(logging.Filter):
+    """Filter that injects request context into log records."""
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        context = get_request_context()
+        record.request_id = context.request_id if context else "-"
+        record.path = context.path if context else "-"
+        record.method = context.method if context else "-"
+        return True
+
+
 def clear_request_context() -> None:
     """Clear the current request context."""
-    # This would be called from middleware
-    pass
+    global _request_context
+    _request_context = None
 
 
 def set_request_context(request_id: str, path: str = "", method: str = "") -> None:
     """Set the current request context for logging."""
-    # This would be called from middleware
-    pass
+    global _request_context
+    _request_context = RequestContext(request_id=request_id, path=path, method=method)
 
 
 def get_logger(name: str = "") -> logging.Logger:

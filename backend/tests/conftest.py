@@ -12,14 +12,20 @@ from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
-# Add backend to path
+# Add project root and backend to path
 backend_dir = Path(__file__).parent.parent
+project_root = backend_dir.parent
+ml_engine_src = project_root / "ml_engine" / "src"
+
+sys.path.insert(0, str(project_root))
+sys.path.insert(0, str(ml_engine_src))
 sys.path.insert(0, str(backend_dir))
 
-from app.core.config import settings
-from app.core.database import Base, get_session
-from app.main import create_app
-from app.models import (  # noqa: F401
+from backend.app.core.config import settings
+from backend.app.core.database import Base, get_session
+print("CONFTEST GET_SESSION ID:", id(get_session))
+from backend.app.main import create_app
+from backend.app.models import (  # noqa: F401
     experiment,
     dataset,
     model_adapter,

@@ -11,6 +11,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
 )
@@ -51,7 +52,7 @@ class ArtifactManifest(Base):
     file_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)  # SHA256
     mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
-    metadata: Mapped[dict] = mapped_column(nullable=False, default=dict)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )
@@ -82,7 +83,7 @@ class ArtifactReference(Base):
     reference_type: Mapped[str] = mapped_column(String(50), nullable=False)  # local, s3, gcs, etc.
     reference_url: Mapped[str] = mapped_column(String(500), nullable=False)
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    metadata: Mapped[dict] = mapped_column(nullable=False, default=dict)
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )

@@ -9,6 +9,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -40,11 +41,11 @@ class Dataset(Base):
     sample_count: Mapped[int] = mapped_column(Integer, nullable=False)
     feature_count: Mapped[int] = mapped_column(Integer, nullable=False)
     license: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
-    tags: Mapped[list] = mapped_column(nullable=False, default=list)  # JSON list of tags
-    feature_names: Mapped[list] = mapped_column(nullable=False, default=list)  # JSON list of feature names
+    tags: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # JSON list of tags
+    feature_names: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # JSON list of feature names
     target_name: Mapped[str] = mapped_column(String(100), nullable=False)
-    class_names: Mapped[Optional[list]] = mapped_column(nullable=True)  # For classification
-    metadata: Mapped[dict] = mapped_column(nullable=False, default=dict)  # Additional metadata
+    class_names: Mapped[Optional[list]] = mapped_column(JSON, nullable=True)  # For classification
+    metadata_: Mapped[dict] = mapped_column("metadata", JSON, nullable=False, default=dict)  # Additional metadata
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False

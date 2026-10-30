@@ -10,6 +10,7 @@ from sqlalchemy import (
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
 )
@@ -40,9 +41,9 @@ class FailedSample(Base):
     confidence: Mapped[float] = mapped_column(Float, nullable=False)
     noise_level: Mapped[float] = mapped_column(Float, nullable=False)  # Severity level
     seed: Mapped[int] = mapped_column(Integer, nullable=False)
-    features_clean: Mapped[dict] = mapped_column(nullable=False, default=dict)  # {feature: value}
-    features_stressed: Mapped[dict] = mapped_column(nullable=False, default=dict)  # {feature: value}
-    feature_diffs: Mapped[dict] = mapped_column(nullable=False, default=dict)  # {feature: diff}
+    features_clean: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # {feature: value}
+    features_stressed: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # {feature: value}
+    feature_diffs: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # {feature: diff}
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False
     )

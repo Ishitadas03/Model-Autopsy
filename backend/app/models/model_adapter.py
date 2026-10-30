@@ -10,6 +10,7 @@ from sqlalchemy import (
     Float,
     Index,
     Integer,
+    JSON,
     String,
     Text,
 )
@@ -42,10 +43,10 @@ class ModelAdapter(Base):
     )
     framework: Mapped[str] = mapped_column(String(100), nullable=False)  # scikit-learn, pytorch, etc.
     model_class: Mapped[str] = mapped_column(String(200), nullable=False)  # Full class path
-    hyperparameters: Mapped[dict] = mapped_column(nullable=False, default=dict)  # JSON dict
+    hyperparameters: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # JSON dict
     baseline_f1: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     baseline_accuracy: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
-    supported_corruptions: Mapped[list] = mapped_column(nullable=False, default=list)  # List of stress types
+    supported_corruptions: Mapped[list] = mapped_column(JSON, nullable=False, default=list)  # List of stress types
     is_active: Mapped[bool] = mapped_column(default=True, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=datetime.utcnow, nullable=False

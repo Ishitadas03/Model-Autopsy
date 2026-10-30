@@ -2,7 +2,7 @@
 
 from functools import lru_cache
 from pathlib import Path
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -67,6 +67,16 @@ class Settings(BaseSettings):
 
     # Security (optional, for future)
     API_KEY: Optional[str] = None
+
+    @field_validator("DEBUG", mode="before")
+    @classmethod
+    def parse_debug(cls, v: Any) -> bool:
+        """Parse debug boolean safely."""
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.lower() in ("true", "1", "yes", "on", "debug")
+        return bool(v)
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

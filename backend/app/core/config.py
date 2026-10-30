@@ -92,6 +92,14 @@ class Settings(BaseSettings):
         """Resolve path to absolute."""
         return Path(v).resolve()
 
+    @field_validator("DEFAULT_SEEDS", mode="before")
+    @classmethod
+    def parse_seeds(cls, v: str | List[int]) -> List[int]:
+        """Parse seeds from string or list."""
+        if isinstance(v, str):
+            return [int(s.strip()) for s in v.split(",")]
+        return v
+
     @property
     def database_url_sync(self) -> str:
         """Get sync database URL for Alembic."""

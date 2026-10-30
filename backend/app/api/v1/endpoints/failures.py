@@ -19,7 +19,7 @@ async def get_failed_samples(
     experiment_id: str,
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
-    filter_class: Optional[str] = Query(None, description="Filter by ground truth or predicted class"),
+    filter_class: Optional[str] = Query(None, alias="filterClass", description="Filter by ground truth or predicted class"),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Retrieve paginated failed sample instances with feature values under clean vs. stressed states."""
@@ -53,12 +53,14 @@ async def get_failed_samples(
 
 def _sample_to_schema(sample) -> FailedSample:
     """Convert FailedSample model to FailedSample schema."""
-    # Build features dict with clean/stressed values
     features = {}
-    for feature_name in sample.features_clean:
+    clean_dict = sample.features_clean or {}
+    stressed_dict = sample.features_stressed or {}
+    all_keys = set(clean_dict.keys()) | set(stressed_dict.keys())
+    for feature_name in all_keys:
         features[feature_name] = {
-            "clean": sample.features_clean.get(feature_name),
-            "stressed": sample.features_stressed.get(feature_name),
+            "clean": clean_dict.get(feature_name, 0),
+            "stressed": stressed_dict.get(feature_name, 0),
         }
 
     return FailedSample(
@@ -68,5 +70,6 @@ def _sample_to_schema(sample) -> FailedSample:
         predictedLabel=sample.predicted_label,
         confidence=sample.confidence,
         noiseLevel=sample.noise_level,
+        severity=sample.noise_level,
         features=features,
     )

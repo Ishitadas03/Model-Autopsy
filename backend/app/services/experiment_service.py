@@ -11,7 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.config import settings
-from backend.app.core.database import Base
+from backend.app.core.database import session_context
 from backend.app.core.exceptions import (
     ConcurrencyLimitError,
     ExperimentAlreadyRunningError,
@@ -30,8 +30,12 @@ from backend.app.models.experiment import (
     TaskType,
 )
 from backend.app.models.failure_sample import FailedSample
-from backend.app.models.artifact import ArtifactManifest, ArtifactReference, ArtifactType
-from backend.app.repositories.experiment import ExperimentRepository, ExperimentRunRepository, ExperimentResultRepository
+from backend.app.models.artifact import ArtifactManifest, ArtifactType
+from backend.app.repositories.experiment import (
+    ExperimentRepository,
+    ExperimentRunRepository,
+    ExperimentResultRepository,
+)
 from backend.app.repositories.failure_sample import FailureSampleRepository
 from backend.app.repositories.artifact import ArtifactRepository
 from backend.app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
@@ -43,6 +47,9 @@ logger = get_logger(__name__)
 class ExperimentService:
     """Service for managing experiment lifecycle."""
 
+    # Class-level background task registry across requests
+    _active_tasks: Dict[str, asyncio.Task] = {}
+
     def __init__(self, session: AsyncSession):
         self.session = session
         self.exp_repo = ExperimentRepository(session)
@@ -50,82 +57,196 @@ class ExperimentService:
         self.result_repo = ExperimentResultRepository(session)
         self.fail_repo = FailureSampleRepository(session)
         self.artifact_repo = ArtifactRepository(session)
-        self._running_experiments: Dict[str, asyncio.Task] = {}
 
     async def create_experiment(self, request: ExperimentRunRequest) -> Experiment:
         """Create and queue a new experiment."""
-        # Check concurrency limit
+        # 1. Validate metric polarity and task compatibility
+        self._validate_metric_polarity(request)
+
+        # 2. Check concurrency limit
         running = await self.exp_repo.get_running_experiments()
         if len(running) >= settings.MAX_CONCURRENT_EXPERIMENTS:
             raise ConcurrencyLimitError(settings.MAX_CONCURRENT_EXPERIMENTS)
 
-        # Generate experiment ID
+        # 3. Generate human-readable experiment ID (e.g., EXP-0001)
         experiment_id = await self.exp_repo.get_next_experiment_id()
 
-        # Determine experiment type from perturbation family
-        experiment_type = self._get_experiment_type(request.perturbationFamily)
-
-        # Build severity levels
-        severity_levels = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+        # 4. Extract parameters supporting both snake_case and camelCase
+        model_name = request.model_name or request.model_id or "RandomForest-v2 (Credit)"
+        dataset_name = request.dataset_name or request.dataset_id
+        dataset_id = request.dataset_id
+        pert_family = request.perturbation_family or "gaussian_noise"
+        noise_type = request.noise_type or "Gaussian Noise"
+        eval_metric = request.evaluation_metric or request.metric or "f1"
+        threshold = float(request.failure_threshold if request.failure_threshold is not None else 0.80)
+        seed = int(request.seed if request.seed is not None else 42)
         seeds = request.seeds or settings.DEFAULT_SEEDS
+        stress_mode = request.stress_mode or "incremental"
+        severity_levels = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+
+        task_type_enum = self._to_task_type(request.task_type)
+        pert_enum = self._to_stress_type(pert_family)
+        mode_enum = self._to_stress_mode(stress_mode)
+
+        experiment_type = self._get_experiment_type(pert_family)
 
         # Generate config YAML
-        config_yaml = self._generate_config_yaml(request, experiment_id, severity_levels, seeds)
+        config_yaml = self._generate_config_yaml(
+            experiment_id=experiment_id,
+            model_name=model_name,
+            dataset_name=dataset_name,
+            dataset_id=dataset_id,
+            perturbation_family=pert_family,
+            evaluation_metric=eval_metric,
+            failure_threshold=threshold,
+            severity_levels=severity_levels,
+            seeds=seeds,
+            seed=seed,
+            stress_mode=stress_mode,
+        )
 
-        # Create experiment record
+        # Create experiment record in database
         experiment = await self.exp_repo.create(
             experiment_id=experiment_id,
-            model_name=request.modelName,
-            dataset_name=request.datasetName,
-            dataset_id=request.datasetId,
-            task_type=TaskType(request.taskType),
-            perturbation_family=StressType(request.perturbationFamily),
-            noise_type=request.noiseType,
-            evaluation_metric=request.evaluationMetric,
-            failure_threshold=request.failureThreshold,
-            seed=request.seed,
-            stress_mode=StressMode(request.stressMode) if request.stressMode else StressMode.INCREMENTAL,
+            model_name=model_name,
+            dataset_name=dataset_name,
+            dataset_id=dataset_id,
+            task_type=task_type_enum,
+            perturbation_family=pert_enum,
+            noise_type=noise_type,
+            evaluation_metric=eval_metric,
+            failure_threshold=threshold,
+            seed=seed,
+            stress_mode=mode_enum,
             severity_levels=severity_levels,
             seeds=seeds,
             config_yaml=config_yaml,
             status=ExperimentStatus.QUEUED,
+            progress_percent=0,
         )
 
-        # Create experiment runs for each seed
-        for i, seed in enumerate(seeds):
+        # Create per-seed runs
+        for i, run_seed in enumerate(seeds):
             await self.run_repo.create(
                 experiment_id=experiment.id,
-                seed=seed,
+                seed=run_seed,
                 run_index=i,
                 status=ExperimentStatus.QUEUED,
+                progress_percent=0,
             )
 
-        # Queue background execution
-        task = asyncio.create_task(self._run_experiment_background(experiment.id, experiment_type, request))
-        self._running_experiments[str(experiment.id)] = task
+        # Request data for ML engine bridge
+        request_data = {
+            "experiment_id": experiment_id,
+            "model_name": model_name,
+            "dataset_name": dataset_name,
+            "dataset_id": dataset_id,
+            "perturbation_family": pert_family,
+            "evaluation_metric": eval_metric,
+            "failure_threshold": threshold,
+            "stress_mode": stress_mode,
+            "severity_levels": severity_levels,
+            "seeds": seeds,
+        }
+
+        # Spawn background execution task
+        exp_db_id = experiment.id
+        task = asyncio.create_task(
+            self._run_experiment_background(exp_db_id, experiment_type, request_data)
+        )
+        ExperimentService._active_tasks[str(exp_db_id)] = task
 
         logger.info(
             "Experiment created and queued",
             experiment_id=experiment_id,
-            db_id=str(experiment.id),
+            db_id=str(exp_db_id),
         )
 
         return experiment
 
+    def _validate_metric_polarity(self, request: ExperimentRunRequest) -> None:
+        """Enforce metric polarity invariant:
+        - Higher is better: f1, accuracy, precision, recall, roc_auc, pr_auc
+        - Lower is better: mae, rmse, loss
+        """
+        metric = (request.evaluation_metric or request.metric or "f1").lower()
+        task_type = (request.task_type or "classification").lower()
+
+        higher_better = {"f1", "accuracy", "precision", "recall", "roc_auc", "pr_auc", "r2"}
+        lower_better = {"mae", "rmse", "loss", "mse"}
+
+        if task_type == "classification" and metric in {"mae", "rmse"}:
+            raise InvalidExperimentConfigError(
+                f"Metric '{metric}' is a regression metric and cannot be used for classification task."
+            )
+
+        if task_type == "regression" and metric in {"f1", "accuracy", "roc_auc", "pr_auc"}:
+            raise InvalidExperimentConfigError(
+                f"Metric '{metric}' is a classification metric and cannot be used for regression task."
+            )
+
+        # Verify failure threshold boundaries
+        if metric in higher_better and request.failure_threshold is not None:
+            if request.failure_threshold < 0.0 or request.failure_threshold > 1.0:
+                raise InvalidExperimentConfigError(
+                    f"Failure threshold for higher-is-better metric '{metric}' must be between 0.0 and 1.0."
+                )
+
+        if metric in lower_better and request.failure_threshold is not None:
+            if request.failure_threshold < 0.0:
+                raise InvalidExperimentConfigError(
+                    f"Failure threshold for lower-is-better metric '{metric}' must be non-negative."
+                )
+
+    def _to_task_type(self, val: Optional[str]) -> TaskType:
+        if not val:
+            return TaskType.CLASSIFICATION
+        try:
+            return TaskType(val.lower())
+        except (ValueError, AttributeError):
+            return TaskType.CLASSIFICATION
+
+    def _to_stress_type(self, val: Optional[str]) -> StressType:
+        if not val:
+            return StressType.GAUSSIAN_NOISE
+        try:
+            return StressType(val.lower())
+        except (ValueError, AttributeError):
+            return StressType.GAUSSIAN_NOISE
+
+    def _to_stress_mode(self, val: Optional[str]) -> StressMode:
+        if not val:
+            return StressMode.INCREMENTAL
+        try:
+            return StressMode(val.lower())
+        except (ValueError, AttributeError):
+            return StressMode.INCREMENTAL
+
     def _get_experiment_type(self, perturbation_family: str) -> str:
-        """Map perturbation family to experiment type."""
+        """Map perturbation family to experiment runner script."""
         mapping = {
             "gaussian_noise": "e001",
             "mcar_missingness": "e002",
             "outlier_contamination": "e003",
-            "multi_corruption": "e002",  # E002 handles multiple
+            "multi_corruption": "e002",
             "cross_model": "e003",
             "failure_patterns": "e004",
         }
-        return mapping.get(perturbation_family, "e001")
+        return mapping.get(str(perturbation_family).lower(), "e001")
 
     def _generate_config_yaml(
-        self, request: ExperimentRunRequest, experiment_id: str, severity_levels: List[float], seeds: List[int]
+        self,
+        experiment_id: str,
+        model_name: str,
+        dataset_name: str,
+        dataset_id: str,
+        perturbation_family: str,
+        evaluation_metric: str,
+        failure_threshold: float,
+        severity_levels: List[float],
+        seeds: List[int],
+        seed: int,
+        stress_mode: str,
     ) -> str:
         """Generate YAML config for the experiment."""
         import yaml
@@ -134,22 +255,22 @@ class ExperimentService:
             "experiment": {
                 "name": experiment_id,
                 "model": {
-                    "name": request.modelName,
-                    "type": "sklearn_rf",  # Default, would be determined from model adapter
-                    "hyperparameters": {"n_estimators": 100, "random_state": request.seed},
+                    "name": model_name,
+                    "type": "sklearn_rf",
+                    "hyperparameters": {"n_estimators": 100, "random_state": seed},
                 },
                 "dataset": {
-                    "name": request.datasetName,
-                    "id": request.datasetId,
+                    "name": dataset_name,
+                    "id": dataset_id,
                 },
                 "stress_test": {
-                    "perturbation_family": request.perturbationFamily,
+                    "perturbation_family": perturbation_family,
                     "severity_levels": severity_levels,
-                    "stress_mode": request.stressMode or "incremental",
+                    "stress_mode": stress_mode,
                 },
                 "evaluation": {
-                    "metric": request.evaluationMetric,
-                    "failure_threshold": request.failureThreshold,
+                    "metric": evaluation_metric,
+                    "failure_threshold": failure_threshold,
                 },
                 "seeds": seeds,
                 "reproducibility": {
@@ -161,174 +282,168 @@ class ExperimentService:
         return yaml.dump(config, default_flow_style=False)
 
     async def _run_experiment_background(
-        self, experiment_db_id: uuid.UUID, experiment_type: str, request: ExperimentRunRequest
+        self, experiment_db_id: uuid.UUID, experiment_type: str, request_data: Dict[str, Any]
     ) -> None:
-        """Background task to run experiment."""
+        """Isolated background runner with dedicated database session."""
         try:
-            # Update status to running
-            experiment = await self.exp_repo.get_by_id(experiment_db_id)
-            if not experiment:
-                logger.error("Experiment not found", experiment_db_id=str(experiment_db_id))
-                return
+            async with session_context() as session:
+                exp_repo = ExperimentRepository(session)
+                run_repo = ExperimentRunRepository(session)
 
-            experiment.status = ExperimentStatus.RUNNING
-            experiment.started_at = datetime.utcnow()
-            experiment.progress_percent = 0
-            await self.session.flush()
+                experiment = await exp_repo.get_by_id(experiment_db_id)
+                if not experiment:
+                    return
 
-            # Update first run to running
-            runs = await self.run_repo.get_by_experiment(experiment_db_id)
-            if runs:
-                runs[0].status = ExperimentStatus.RUNNING
-                runs[0].started_at = datetime.utcnow()
-                await self.session.flush()
+                experiment.status = ExperimentStatus.RUNNING
+                experiment.started_at = datetime.utcnow()
+                experiment.progress_percent = 0
+                await session.flush()
 
-            # Prepare request data for ML engine
-            request_data = {
-                "experiment_id": experiment.experiment_id,
-                "model_name": request.modelName,
-                "dataset_name": request.datasetName,
-                "dataset_id": request.datasetId,
-                "perturbation_family": request.perturbationFamily,
-                "evaluation_metric": request.evaluationMetric,
-                "failure_threshold": request.failureThreshold,
-                "stress_mode": request.stressMode or "incremental",
-                "severity_levels": experiment.severity_levels,
-                "seeds": experiment.seeds,
-            }
+                runs = await run_repo.get_by_experiment(experiment_db_id)
+                if runs:
+                    runs[0].status = ExperimentStatus.RUNNING
+                    runs[0].started_at = datetime.utcnow()
+                    await session.flush()
 
-            # Progress callback
+            # Progress update callback
             async def progress_callback(progress: ProgressData):
-                await self._update_progress(experiment_db_id, progress)
+                try:
+                    async with session_context() as prog_session:
+                        p_exp_repo = ExperimentRepository(prog_session)
+                        p_run_repo = ExperimentRunRepository(prog_session)
+                        p_exp = await p_exp_repo.get_by_id(experiment_db_id)
+                        if p_exp:
+                            p_exp.progress_percent = progress.progress
+                            p_exp.current_seed_index = progress.seed_index
+                            p_exp.current_severity_index = progress.severity_index
+                            p_runs = await p_run_repo.get_by_experiment(experiment_db_id)
+                            if p_runs and progress.seed is not None:
+                                for r in p_runs:
+                                    if r.seed == progress.seed:
+                                        r.status = ExperimentStatus.RUNNING
+                                        r.progress_percent = progress.progress
+                                        r.current_severity = progress.severity
+                                        break
+                            await prog_session.flush()
+                except Exception as ex:
+                    logger.debug(f"Progress update non-critical error: {ex}")
 
-            # Run experiment
-            result = await ml_engine_bridge.run_experiment(
-                experiment_id=experiment.experiment_id,
+            # Run ML engine script
+            result_data = await ml_engine_bridge.run_experiment(
+                experiment_id=request_data["experiment_id"],
                 experiment_type=experiment_type,
                 request_data=request_data,
                 progress_callback=progress_callback,
             )
 
-            # Process results
-            await self._process_results(experiment_db_id, result)
+            # Store completed results, artifacts, and failed samples
+            async with session_context() as finish_session:
+                await self._process_and_save_results(finish_session, experiment_db_id, result_data)
 
-            # Mark as completed
-            experiment = await self.exp_repo.get_by_id(experiment_db_id)
-            experiment.status = ExperimentStatus.COMPLETED
-            experiment.completed_at = datetime.utcnow()
-            experiment.progress_percent = 100
-            await self.session.flush()
+                f_exp_repo = ExperimentRepository(finish_session)
+                f_run_repo = ExperimentRunRepository(finish_session)
 
-            # Mark all runs as completed
-            for run in runs:
-                run.status = ExperimentStatus.COMPLETED
-                run.completed_at = datetime.utcnow()
-                run.progress_percent = 100
-            await self.session.flush()
+                f_exp = await f_exp_repo.get_by_id(experiment_db_id)
+                if f_exp:
+                    f_exp.status = ExperimentStatus.COMPLETED
+                    f_exp.completed_at = datetime.utcnow()
+                    f_exp.progress_percent = 100
 
-            logger.info("Experiment completed", experiment_id=experiment.experiment_id)
+                f_runs = await f_run_repo.get_by_experiment(experiment_db_id)
+                for r in f_runs:
+                    r.status = ExperimentStatus.COMPLETED
+                    r.completed_at = datetime.utcnow()
+                    r.progress_percent = 100
+
+                await finish_session.flush()
+
+            logger.info("Experiment run successfully completed", experiment_id=request_data["experiment_id"])
 
         except asyncio.CancelledError:
-            logger.info("Experiment cancelled", experiment_db_id=str(experiment_db_id))
-            await self._mark_experiment_cancelled(experiment_db_id)
+            logger.info("Experiment run cancelled in background", db_id=str(experiment_db_id))
+            async with session_context() as cancel_session:
+                await self._mark_experiment_cancelled(cancel_session, experiment_db_id)
             raise
         except Exception as e:
-            logger.exception("Experiment failed", experiment_db_id=str(experiment_db_id))
-            await self._mark_experiment_failed(experiment_db_id, str(e))
-            raise ExperimentExecutionError(
-                experiment_id=str(experiment_db_id),
-                reason=str(e),
-            )
+            logger.exception("Experiment run failed in background", db_id=str(experiment_db_id))
+            async with session_context() as fail_session:
+                await self._mark_experiment_failed(fail_session, experiment_db_id, str(e))
         finally:
-            # Clean up running experiments tracking
-            self._running_experiments.pop(str(experiment_db_id), None)
+            ExperimentService._active_tasks.pop(str(experiment_db_id), None)
 
-    async def _update_progress(self, experiment_db_id: uuid.UUID, progress: ProgressData) -> None:
-        """Update experiment progress."""
-        experiment = await self.exp_repo.get_by_id(experiment_db_id)
-        if experiment:
-            experiment.progress_percent = progress.progress
-            experiment.current_seed_index = progress.seed_index if hasattr(progress, 'seed_index') else 0
-            experiment.current_severity_index = progress.severity_index if hasattr(progress, 'severity_index') else 0
-            await self.session.flush()
-
-            # Update current run
-            runs = await self.run_repo.get_by_experiment(experiment_db_id)
-            if runs and progress.seed is not None:
-                for run in runs:
-                    if run.seed == progress.seed:
-                        run.status = ExperimentStatus.RUNNING
-                        run.progress_percent = progress.progress
-                        run.current_severity = progress.severity
-                        await self.session.flush()
-                        break
-
-    async def _process_results(
-        self, experiment_db_id: uuid.UUID, result_data: Dict[str, Any]
+    async def _process_and_save_results(
+        self, session: AsyncSession, experiment_db_id: uuid.UUID, result_data: Dict[str, Any]
     ) -> None:
-        """Process and store experiment results."""
-        experiment = await self.exp_repo.get_by_id(experiment_db_id)
+        """Process and store experiment results, artifacts, and failure samples."""
+        exp_repo = ExperimentRepository(session)
+        result_repo = ExperimentResultRepository(session)
+        artifact_repo = ArtifactRepository(session)
+        fail_repo = FailureSampleRepository(session)
+
+        experiment = await exp_repo.get_by_id(experiment_db_id)
         if not experiment:
             return
 
         results = result_data.get("results", {})
         artifacts = result_data.get("artifacts", [])
+        failed_samples = results.get("failed_samples", [])
 
-        # Create ExperimentResult
-        exp_result = await self.result_repo.create(
+        # Create or update ExperimentResult
+        await result_repo.create(
             experiment_id=experiment_db_id,
             baseline_macro_f1=results.get("baseline_macro_f1"),
             baseline_accuracy=results.get("baseline_accuracy"),
-            baseline_per_class=results.get("baseline_per_class"),
             worst_case_macro_f1=results.get("worst_case_macro_f1"),
             worst_case_accuracy=results.get("worst_case_accuracy"),
             worst_case_severity=results.get("worst_case_severity"),
             observed_boundary=results.get("observed_boundary"),
+            boundary_caveat="Observed failure boundary under the specified experimental configuration.",
             curve_data=results.get("curve_data", []),
             feature_vulnerabilities=results.get("feature_vulnerabilities", []),
-            metric_statistics=results.get("metric_statistics"),
             statistical_validation=results.get("statistical_validation"),
-            failed_samples_count=results.get("failed_samples_count", 0),
-            consensus_failures=results.get("consensus_failures"),
-            error_persistence_rate=results.get("error_persistence_rate"),
+            failed_samples_count=len(failed_samples),
         )
 
-        # Store artifacts
-        for artifact in artifacts:
-            await self.artifact_repo.create(
+        # Store artifacts in database
+        for art in artifacts:
+            file_path_obj = settings.ARTIFACTS_BASE_DIR / art["file_path"]
+            content_hash = self._compute_hash(file_path_obj)
+            art_type_str = art.get("type", "results_json")
+            try:
+                art_type_enum = ArtifactType(art_type_str)
+            except ValueError:
+                art_type_enum = ArtifactType.RESULTS_JSON
+
+            await artifact_repo.create(
                 experiment_id=experiment_db_id,
-                artifact_type=ArtifactType(artifact["type"]),
-                seed=artifact.get("seed"),
-                file_path=artifact["file_path"],
-                file_name=artifact["file_name"],
-                file_size_bytes=artifact["file_size"],
-                content_hash=self._compute_hash(
-                    settings.ARTIFACTS_BASE_DIR / artifact["file_path"]
-                ),
-                mime_type=self._get_mime_type(artifact["file_name"]),
+                artifact_type=art_type_enum,
+                seed=art.get("seed"),
+                file_path=art["file_path"],
+                file_name=art["file_name"],
+                file_size_bytes=art["file_size"],
+                content_hash=content_hash,
+                mime_type=self._get_mime_type(art["file_name"]),
             )
 
-        # Store failed samples if available
-        failed_samples = results.get("failed_samples", [])
-        for sample in failed_samples:
-            await self.fail_repo.create(
+        # Store failed samples
+        for s in failed_samples:
+            await fail_repo.create(
                 experiment_id=experiment_db_id,
-                sample_index=sample.get("sample_index", 0),
-                sample_id=sample.get("sample_id", f"samp-{sample.get('sample_index', 0)}"),
-                true_label=sample.get("true_label", ""),
-                predicted_label=sample.get("predicted_label", ""),
-                confidence=sample.get("confidence", 0.0),
-                noise_level=sample.get("noise_level", 0.0),
-                seed=sample.get("seed", 0),
-                features_clean=sample.get("features_clean", {}),
-                features_stressed=sample.get("features_stressed", {}),
-                feature_diffs=sample.get("feature_diffs", {}),
+                sample_index=s.get("sample_index", 0),
+                sample_id=s.get("sample_id", "samp-0"),
+                true_label=str(s.get("true_label", "")),
+                predicted_label=str(s.get("predicted_label", "")),
+                confidence=float(s.get("confidence", 0.0)),
+                noise_level=float(s.get("noise_level", 0.0)),
+                seed=int(s.get("seed", 42)),
+                features_clean=s.get("features_clean", {}),
+                features_stressed=s.get("features_stressed", {}),
+                feature_diffs=s.get("feature_diffs", {}),
             )
 
-        await self.session.flush()
+        await session.flush()
 
     def _compute_hash(self, file_path: Path) -> str:
-        """Compute SHA256 hash of file."""
         if not file_path.exists():
             return ""
         sha256 = hashlib.sha256()
@@ -338,60 +453,63 @@ class ExperimentService:
         return sha256.hexdigest()
 
     def _get_mime_type(self, filename: str) -> str:
-        """Get MIME type from filename."""
         if filename.endswith(".json"):
             return "application/json"
         elif filename.endswith(".csv"):
             return "text/csv"
         elif filename.endswith(".md"):
             return "text/markdown"
-        elif filename.endswith(".yaml") or filename.endswith(".yml"):
-            return "application/x-yaml"
+        elif filename.endswith(".png"):
+            return "image/png"
         return "application/octet-stream"
 
-    async def _mark_experiment_cancelled(self, experiment_db_id: uuid.UUID) -> None:
-        """Mark experiment as cancelled."""
-        experiment = await self.exp_repo.get_by_id(experiment_db_id)
-        if experiment:
-            experiment.status = ExperimentStatus.CANCELLED
-            experiment.completed_at = datetime.utcnow()
-            await self.session.flush()
+    async def _mark_experiment_cancelled(self, session: AsyncSession, experiment_db_id: uuid.UUID) -> None:
+        exp_repo = ExperimentRepository(session)
+        run_repo = ExperimentRunRepository(session)
 
-            runs = await self.run_repo.get_by_experiment(experiment_db_id)
-            for run in runs:
-                if run.status in [ExperimentStatus.QUEUED, ExperimentStatus.RUNNING]:
-                    run.status = ExperimentStatus.CANCELLED
-                    run.completed_at = datetime.utcnow()
-            await self.session.flush()
+        exp = await exp_repo.get_by_id(experiment_db_id)
+        if exp:
+            exp.status = ExperimentStatus.CANCELLED
+            exp.completed_at = datetime.utcnow()
 
-    async def _mark_experiment_failed(self, experiment_db_id: uuid.UUID, error_message: str) -> None:
-        """Mark experiment as failed."""
-        experiment = await self.exp_repo.get_by_id(experiment_db_id)
-        if experiment:
-            experiment.status = ExperimentStatus.FAILED
-            experiment.error_message = error_message
-            experiment.completed_at = datetime.utcnow()
-            await self.session.flush()
+        runs = await run_repo.get_by_experiment(experiment_db_id)
+        for r in runs:
+            if r.status in [ExperimentStatus.QUEUED, ExperimentStatus.RUNNING]:
+                r.status = ExperimentStatus.CANCELLED
+                r.completed_at = datetime.utcnow()
+        await session.flush()
 
-            runs = await self.run_repo.get_by_experiment(experiment_db_id)
-            for run in runs:
-                if run.status in [ExperimentStatus.QUEUED, ExperimentStatus.RUNNING]:
-                    run.status = ExperimentStatus.FAILED
-                    run.error_message = error_message
-                    run.completed_at = datetime.utcnow()
-            await self.session.flush()
+    async def _mark_experiment_failed(
+        self, session: AsyncSession, experiment_db_id: uuid.UUID, error_message: str
+    ) -> None:
+        exp_repo = ExperimentRepository(session)
+        run_repo = ExperimentRunRepository(session)
 
-    async def cancel_experiment(self, experiment_db_id: uuid.UUID) -> None:
-        """Cancel a running experiment."""
+        exp = await exp_repo.get_by_id(experiment_db_id)
+        if exp:
+            exp.status = ExperimentStatus.FAILED
+            exp.error_message = error_message
+            exp.completed_at = datetime.utcnow()
+
+        runs = await run_repo.get_by_experiment(experiment_db_id)
+        for r in runs:
+            if r.status in [ExperimentStatus.QUEUED, ExperimentStatus.RUNNING]:
+                r.status = ExperimentStatus.FAILED
+                r.error_message = error_message
+                r.completed_at = datetime.utcnow()
+        await session.flush()
+
+    async def cancel_experiment(self, experiment_db_id: uuid.UUID) -> Dict[str, Any]:
+        """Cancel a running or queued experiment."""
         experiment = await self.exp_repo.get_by_id(experiment_db_id)
         if not experiment:
             raise ExperimentNotFoundError(str(experiment_db_id))
 
-        if experiment.status not in [ExperimentStatus.QUEUED, ExperimentStatus.RUNNING]:
-            raise ExperimentAlreadyRunningError(experiment.experiment_id)
+        # Cancel bridge subprocess if active
+        bridge_res = await ml_engine_bridge.cancel_experiment(experiment.experiment_id)
 
-        # Cancel background task
-        task = self._running_experiments.get(str(experiment_db_id))
+        # Cancel async task if active
+        task = ExperimentService._active_tasks.get(str(experiment_db_id))
         if task and not task.done():
             task.cancel()
             try:
@@ -399,5 +517,13 @@ class ExperimentService:
             except asyncio.CancelledError:
                 pass
 
-        # Mark as cancelled
-        await self._mark_experiment_cancelled(experiment_db_id)
+        # Update DB status
+        await self._mark_experiment_cancelled(self.session, experiment_db_id)
+
+        return {
+            "success": True,
+            "experimentId": experiment.experiment_id,
+            "status": "cancelled",
+            "terminatedPid": bridge_res.get("terminated_pid"),
+            "confirmedStopped": bridge_res.get("confirmed_stopped", True),
+        }

@@ -26,7 +26,7 @@ class ArtifactFormat(str, Enum):
 
 @router.get("/e003")
 async def get_e003_artifact(
-    format: ArtifactFormat = Query(ArtifactFormat.JSON, description="Output format"),
+    format: str = Query("json", description="Output format: json, csv, or markdown"),
     session: AsyncSession = Depends(get_session),
 ):
     """Get E003 canonical experiment artifact in specified format."""
@@ -41,7 +41,7 @@ async def get_experiment_artifact(
     experiment_id: str,
     artifact_type: str,
     seed: Optional[int] = Query(None, description="Specific seed (null for aggregated)"),
-    format: ArtifactFormat = Query(ArtifactFormat.JSON, description="Output format"),
+    format: str = Query("json", description="Output format: json, csv, or markdown"),
     session: AsyncSession = Depends(get_session),
 ):
     """Get experiment artifact by type."""

@@ -81,17 +81,23 @@ def create_app() -> FastAPI:
     async def scientific_invariants_middleware(request: Request, call_next):
         response = await call_next(request)
 
-        # Only process JSON responses
-        if response.media_type == "application/json" and hasattr(response, "body"):
+        content_type = response.headers.get("content-type", "")
+        if "application/json" in content_type:
             try:
                 import json
-                body = json.loads(response.body)
+                body_bytes = b""
+                async for chunk in response.body_iterator:
+                    body_bytes += chunk if isinstance(chunk, bytes) else chunk.encode("utf-8")
+
+                body = json.loads(body_bytes.decode("utf-8"))
                 body = _inject_scientific_caveats(body)
+
+                headers = dict(response.headers)
+                headers.pop("content-length", None)
                 return JSONResponse(
                     content=body,
                     status_code=response.status_code,
-                    headers=dict(response.headers),
-                    media_type=response.media_type,
+                    headers=headers,
                 )
             except Exception:
                 # If we can't parse/modify, return original
@@ -120,30 +126,50 @@ def create_app() -> FastAPI:
 
 
 def _inject_scientific_caveats(data: dict) -> dict:
-    """Recursively inject scientific caveats into response data."""
+    """Recursively inject scientific caveats and enforce scientific invariants."""
     if not isinstance(data, dict):
         if isinstance(data, list):
             return [_inject_scientific_caveats(item) for item in data]
         return data
 
+    FORBIDDEN_FIELDS = {
+        "robustness_score",
+        "robustnessScore",
+        "overall_score",
+        "overallScore",
+        "letter_grade",
+        "letterGrade",
+        "subjective_rating",
+        "subjectiveRating",
+    }
+
     result = {}
     for key, value in data.items():
-        # Inject caveat for observed_boundary / failure_boundary fields
-        if key in ("observed_boundary", "observedFailureBoundary", "failure_boundary", "boundary"):
-            if isinstance(value, (int, float)):
-                result[key] = value
-                result[f"{key}_caveat"] = "Observed failure boundary under the specified experimental configuration."
-            else:
-                result[key] = value
-        # Inject caveat for feature vulnerabilities / sensitivities
+        # Invariant 3: NO aggregate robustness score, letter grade, or subjective rating
+        if key in FORBIDDEN_FIELDS:
+            continue
+
+        # Invariant 1: Boundary metric responses MUST include: 'Observed failure boundary under the specified experimental configuration.'
+        if key in ("observed_boundary", "observedBoundary", "failure_boundary", "boundary"):
+            result[key] = value
+            result["observed_boundary_caveat"] = "Observed failure boundary under the specified experimental configuration."
+            result["observedBoundaryLabel"] = "Observed failure boundary under the specified experimental configuration."
+        # Invariant 2: Feature sensitivity responses MUST include caveat: 'Empirical sensitivity — not a causal explanation.'
         elif key in ("feature_vulnerabilities", "featureVulnerabilities", "feature_sensitivities", "sensitivities"):
             if isinstance(value, list):
                 result[key] = [
                     {**item, "caveat": "Empirical sensitivity — not a causal explanation."}
-                    if isinstance(item, dict) and "caveat" not in item
+                    if isinstance(item, dict)
                     else item
                     for item in value
                 ]
+            else:
+                result[key] = value
+        elif key in ("most_vulnerable_feature", "mostVulnerableFeature"):
+            if isinstance(value, dict):
+                vuln = dict(value)
+                vuln["caveat"] = "Empirical sensitivity — not a causal explanation."
+                result[key] = vuln
             else:
                 result[key] = value
         # Recurse into nested dicts

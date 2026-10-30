@@ -23,7 +23,6 @@ sys.path.insert(0, str(backend_dir))
 
 from backend.app.core.config import settings
 from backend.app.core.database import Base, get_session
-print("CONFTEST GET_SESSION ID:", id(get_session))
 from backend.app.main import create_app
 from backend.app.models import (  # noqa: F401
     experiment,
@@ -73,7 +72,7 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest.fixture
 async def client(test_session) -> AsyncGenerator[AsyncClient, None]:
     """Create test client with dependency override."""
-    app = create_app()
+    from backend.app.main import app
 
     async def override_get_session():
         yield test_session

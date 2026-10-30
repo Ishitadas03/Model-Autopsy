@@ -24,20 +24,20 @@ router = APIRouter()
 async def list_experiments(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
-    status: Optional[str] = Query(None),
+    status_filter: Optional[str] = Query(None, alias="status"),
     session: AsyncSession = Depends(get_session),
 ) -> List[ExperimentSummarySchema]:
     """List all submitted and completed autopsy experiments."""
     repo = ExperimentRepository(session)
 
-    if status:
+    if status_filter:
         try:
-            run_status = RunStatus(status)
+            run_status = RunStatus(status_filter)
             experiments = await repo.get_by_status(run_status, skip, limit)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=f"Invalid status: {status}",
+                detail=f"Invalid status: {status_filter}",
             )
     else:
         experiments = await repo.get_all(skip, limit)
@@ -145,35 +145,43 @@ async def get_experiment_progress(
             detail=f"Experiment {experiment_id} not found",
         )
 
+    status_val = experiment.status.value if hasattr(experiment.status, "value") else str(experiment.status)
     return ExperimentProgressSchema(
-        experiment_id=experiment.experiment_id,
-        status=RunStatus(experiment.status.value),
-        progress_percent=experiment.progress_percent,
-        current_seed_index=experiment.current_seed_index,
-        current_severity_index=experiment.current_severity_index,
-        total_seeds=len(experiment.seeds) if experiment.seeds else 1,
-        total_severities=len(experiment.severity_levels) if experiment.severity_levels else 1,
-        error_message=experiment.error_message,
+        experimentId=experiment.experiment_id,
+        status=status_val,
+        progressPercent=float(experiment.progress_percent or 0),
+        currentSeedIndex=experiment.current_seed_index or 0,
+        currentSeverityIndex=experiment.current_severity_index or 0,
+        totalSeeds=len(experiment.seeds) if experiment.seeds else 1,
+        totalSeverities=len(experiment.severity_levels) if experiment.severity_levels else 1,
+        errorMessage=experiment.error_message,
     )
 
 
 def _experiment_to_summary(experiment) -> ExperimentSummarySchema:
     """Convert Experiment model to ExperimentSummarySchema."""
     result = experiment.result
+    task_type_val = experiment.task_type.value if hasattr(experiment.task_type, "value") else str(experiment.task_type)
+    pert_val = experiment.perturbation_family.value if hasattr(experiment.perturbation_family, "value") else str(experiment.perturbation_family)
+    status_val = experiment.status.value if hasattr(experiment.status, "value") else str(experiment.status)
+
     return ExperimentSummarySchema(
         id=experiment.experiment_id,
         modelName=experiment.model_name,
         datasetName=experiment.dataset_name,
         datasetId=experiment.dataset_id,
-        taskType=experiment.task_type.value,
-        perturbationFamily=experiment.perturbation_family.value,
+        taskType=task_type_val,
+        perturbationFamily=pert_val,
         noiseType=experiment.noise_type,
         evaluationMetric=experiment.evaluation_metric,
-        failureThreshold=experiment.failure_threshold,
+        failureThreshold=float(experiment.failure_threshold),
         seed=experiment.seed,
-        status=RunStatus(experiment.status.value),
-        progressPercent=experiment.progress_percent,
-        createdAt=experiment.created_at.isoformat() + "Z",
+        status=status_val,
+        progressPercent=float(experiment.progress_percent or 0),
+        createdAt=experiment.created_at.isoformat() + "Z" if experiment.created_at else "",
+        completedAt=experiment.completed_at.isoformat() + "Z" if experiment.completed_at else None,
+        observedBoundary=result.observed_boundary if result else None,
+        errorMessage=experiment.error_message,
         results=_build_results(result) if result else None,
     )
 
@@ -181,24 +189,33 @@ def _experiment_to_summary(experiment) -> ExperimentSummarySchema:
 def _experiment_to_detail(experiment) -> ExperimentDetailSchema:
     """Convert Experiment model to ExperimentDetailSchema."""
     summary = _experiment_to_summary(experiment)
-    return ExperimentDetailSchema(
-        **summary.model_dump(),
-        runs=[
-            {
+    runs_data = []
+    if hasattr(experiment, "runs") and experiment.runs:
+        for run in experiment.runs:
+            run_status = run.status.value if hasattr(run.status, "value") else str(run.status)
+            runs_data.append({
                 "seed": run.seed,
-                "status": RunStatus(run.status.value),
+                "status": run_status,
                 "progress_percent": run.progress_percent,
                 "current_severity": run.current_severity,
                 "error_message": run.error_message,
-            }
-            for run in experiment.runs
-        ],
-        config_yaml=experiment.config_yaml,
-        severity_levels=experiment.severity_levels,
-        seeds=experiment.seeds,
-        stress_mode=experiment.stress_mode.value,
-        started_at=experiment.started_at.isoformat() + "Z" if experiment.started_at else None,
-        completed_at=experiment.completed_at.isoformat() + "Z" if experiment.completed_at else None,
+            })
+
+    stress_mode_val = (
+        experiment.stress_mode.value
+        if hasattr(experiment.stress_mode, "value")
+        else str(experiment.stress_mode or "incremental")
+    )
+
+    return ExperimentDetailSchema(
+        **summary.model_dump(),
+        runs=runs_data,
+        configYaml=experiment.config_yaml,
+        severityLevels=experiment.severity_levels or [],
+        seeds=experiment.seeds or [],
+        stressMode=stress_mode_val,
+        startedAt=experiment.started_at.isoformat() + "Z" if experiment.started_at else None,
+        completedAt=experiment.completed_at.isoformat() + "Z" if experiment.completed_at else None,
     )
 
 
@@ -211,7 +228,10 @@ def _build_results(result) -> dict:
         "baselineScore": result.baseline_macro_f1,
         "worstCaseScore": result.worst_case_macro_f1,
         "observedBoundary": result.observed_boundary,
+        "observedBoundaryLabel": "Observed failure boundary under the specified experimental configuration.",
+        "observed_boundary_caveat": "Observed failure boundary under the specified experimental configuration.",
         "failedSamplesCount": result.failed_samples_count,
         "curveData": result.curve_data or [],
         "featureVulnerabilities": result.feature_vulnerabilities or [],
+        "statisticalValidation": result.statistical_validation,
     }

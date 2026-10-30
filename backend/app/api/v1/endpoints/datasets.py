@@ -17,7 +17,6 @@ async def list_datasets(
     session: AsyncSession = Depends(get_session),
 ) -> List[DatasetSchema]:
     """List available benchmark datasets registered in the system."""
-    print("DEBUG DATASETS SESSION BIND:", getattr(session, "bind", None))
     repo = DatasetRepository(session)
 
     # Seed default datasets if empty

@@ -21,6 +21,10 @@ class Base(DeclarativeBase):
 
 
 # Create async engine
+connect_args = {}
+if "postgresql" in settings.DATABASE_URL:
+    connect_args = {"timeout": 2.0, "command_timeout": 5.0}
+
 engine: AsyncEngine = create_async_engine(
     settings.DATABASE_URL,
     pool_size=settings.DATABASE_POOL_SIZE,
@@ -28,6 +32,7 @@ engine: AsyncEngine = create_async_engine(
     pool_timeout=settings.DATABASE_POOL_TIMEOUT,
     pool_pre_ping=True,
     echo=settings.DEBUG,
+    connect_args=connect_args,
 )
 
 # Session factory

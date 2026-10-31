@@ -8,7 +8,7 @@ from typing import AsyncGenerator, Generator
 
 import pytest
 import pytest_asyncio
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
@@ -37,15 +37,7 @@ from backend.app.models import (  # noqa: F401
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
 
 
-@pytest.fixture(scope="session")
-def event_loop() -> Generator[asyncio.AbstractEventLoop, None, None]:
-    """Create event loop for session."""
-    loop = asyncio.get_event_loop_policy().new_event_loop()
-    yield loop
-    loop.close()
-
-
-@pytest.fixture(scope="session")
+@pytest_asyncio.fixture
 async def test_engine():
     """Create test database engine."""
     engine = create_async_engine(TEST_DATABASE_URL, echo=False)
@@ -53,13 +45,15 @@ async def test_engine():
         await conn.run_sync(Base.metadata.create_all)
     yield engine
     await engine.dispose()
-    # Clean up test database file
     test_db = Path("./test.db")
     if test_db.exists():
-        test_db.unlink()
+        try:
+            test_db.unlink()
+        except OSError:
+            pass
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
     """Create test database session."""
     async_session = sessionmaker(
@@ -69,7 +63,7 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-@pytest.fixture
+@pytest_asyncio.fixture
 async def client(test_session) -> AsyncGenerator[AsyncClient, None]:
     """Create test client with dependency override."""
     from backend.app.main import app
@@ -79,7 +73,8 @@ async def client(test_session) -> AsyncGenerator[AsyncClient, None]:
 
     app.dependency_overrides[get_session] = override_get_session
 
-    async with AsyncClient(app=app, base_url="http://test") as ac:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
         yield ac
 
     app.dependency_overrides.clear()

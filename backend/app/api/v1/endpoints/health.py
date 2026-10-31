@@ -1,5 +1,6 @@
 """Health check endpoints."""
 
+import asyncio
 from fastapi import APIRouter, Depends, Request
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +17,7 @@ async def health_check(request: Request, session: AsyncSession = Depends(get_ses
     # Check database connectivity
     db_status = "ok"
     try:
-        await session.execute(text("SELECT 1"))
+        await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=1.0)
     except Exception:
         db_status = "error"
 

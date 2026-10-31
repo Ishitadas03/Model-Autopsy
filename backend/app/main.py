@@ -1,8 +1,9 @@
 """Model Autopsy FastAPI Application."""
 
+import asyncio
 import uuid
 from contextlib import asynccontextmanager
-from typing import AsyncGenerator
+from typing import Any, AsyncGenerator
 
 from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,15 +32,30 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Starting Model Autopsy API", version=settings.APP_VERSION)
 
     # Initialize database
-    await init_db()
-    logger.info("Database initialized")
+    try:
+        await asyncio.wait_for(init_db(), timeout=1.5)
+        logger.info("Database initialized")
+    except Exception as e:
+        logger.warning(f"Database initialization deferred (database not ready): {e}")
 
     yield
 
     # Shutdown
     logger.info("Shutting down Model Autopsy API")
-    await close_db()
-    logger.info("Database connections closed")
+    try:
+        await asyncio.wait_for(close_db(), timeout=1.0)
+        logger.info("Database connections closed")
+    except Exception as e:
+        logger.warning(f"Error closing database connections: {e}")
+
+
+class ScientificJSONResponse(JSONResponse):
+    """Custom JSONResponse that automatically enforces scientific invariants on all responses."""
+
+    def render(self, content: Any) -> bytes:
+        if isinstance(content, (dict, list)):
+            content = _inject_scientific_caveats(content)
+        return super().render(content)
 
 
 def create_app() -> FastAPI:
@@ -51,6 +67,7 @@ def create_app() -> FastAPI:
         docs_url="/docs",
         redoc_url="/redoc",
         openapi_url="/openapi.json",
+        default_response_class=ScientificJSONResponse,
         lifespan=lifespan,
     )
 
@@ -69,40 +86,10 @@ def create_app() -> FastAPI:
         request_id = request.headers.get("X-Request-ID", str(uuid.uuid4()))
         set_request_context(request_id=request_id)
 
-        # Add request ID to response headers
         response: Response = await call_next(request)
         response.headers["X-Request-ID"] = request_id
 
         clear_request_context()
-        return response
-
-    # Scientific invariants middleware - inject caveats on boundary/sensitivity fields
-    @app.middleware("http")
-    async def scientific_invariants_middleware(request: Request, call_next):
-        response = await call_next(request)
-
-        content_type = response.headers.get("content-type", "")
-        if "application/json" in content_type:
-            try:
-                import json
-                body_bytes = b""
-                async for chunk in response.body_iterator:
-                    body_bytes += chunk if isinstance(chunk, bytes) else chunk.encode("utf-8")
-
-                body = json.loads(body_bytes.decode("utf-8"))
-                body = _inject_scientific_caveats(body)
-
-                headers = dict(response.headers)
-                headers.pop("content-length", None)
-                return JSONResponse(
-                    content=body,
-                    status_code=response.status_code,
-                    headers=headers,
-                )
-            except Exception:
-                # If we can't parse/modify, return original
-                pass
-
         return response
 
     # Register exception handlers

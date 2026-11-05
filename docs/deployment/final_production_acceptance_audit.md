@@ -199,3 +199,4 @@ A live experiment lifecycle was exercised through the production Vercel frontend
 - **Concurrency Limit:** Enforced at `MAX_CONCURRENT_EXPERIMENTS=1` to guarantee single-tenant CPU stability during multi-seed loops.
 - **Cold Starts:** Free-tier instances spin down after 15 minutes of inactivity; initial cold-start latency is ~30–45s. Once warm, API response times average ~80–120ms.
 - **Health Check Resilience:** Handshake timeout set to 4.0s to accommodate cross-region TLS handshakes between Render (Oregon) and Supabase (Tokyo) without false-positive failures.
+

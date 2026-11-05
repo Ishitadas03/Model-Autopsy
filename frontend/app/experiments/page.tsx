@@ -64,10 +64,10 @@ export default function ExperimentsPage() {
     if (search.trim()) {
       const q = search.toLowerCase();
       return (
-        exp.id.toLowerCase().includes(q) ||
-        exp.title.toLowerCase().includes(q) ||
-        exp.modelName.toLowerCase().includes(q) ||
-        exp.datasetName.toLowerCase().includes(q)
+        (exp.id || '').toLowerCase().includes(q) ||
+        (exp.title || '').toLowerCase().includes(q) ||
+        (exp.modelName || '').toLowerCase().includes(q) ||
+        (exp.datasetName || '').toLowerCase().includes(q)
       );
     }
     return true;
@@ -213,12 +213,18 @@ export default function ExperimentsPage() {
         ) : (
           <div className="space-y-3">
             {filtered.map((exp) => {
-              const degradation = exp.results
-                ? (
-                    (exp.results.worstCaseMetrics[exp.metric] || 0) * 100 -
-                    (exp.results.baselineMetrics[exp.metric] || 0) * 100
-                  ).toFixed(1)
-                : null;
+              const worstCase =
+                exp.results?.worstCaseMetrics?.[exp.metric] ??
+                exp.results?.worstCaseMetrics?.f1 ??
+                (exp.results as any)?.worstCaseScore;
+              const baseline =
+                exp.results?.baselineMetrics?.[exp.metric] ??
+                exp.results?.baselineMetrics?.f1 ??
+                (exp.results as any)?.baselineScore;
+              const degradation =
+                worstCase !== undefined && baseline !== undefined && worstCase !== null && baseline !== null
+                  ? ((Number(worstCase) - Number(baseline)) * 100).toFixed(1)
+                  : null;
 
               return (
                 <div
@@ -231,7 +237,7 @@ export default function ExperimentsPage() {
                         {exp.id}
                       </span>
                       <h3 className="font-manrope font-semibold text-sm text-white group-hover:text-accent transition-colors">
-                        {exp.title}
+                        {exp.title || `${exp.modelName || 'Model'} — ${exp.noiseType || exp.perturbationFamily || 'Stress Test'}`}
                       </h3>
                       <StatusPill status={exp.status} />
                     </div>

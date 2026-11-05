@@ -2,6 +2,14 @@
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['three'],
+  async rewrites() {
+    return [
+      {
+        source: '/api/:path*',
+        destination: 'http://localhost:8000/api/:path*',
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

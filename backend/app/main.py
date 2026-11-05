@@ -9,11 +9,11 @@ from fastapi import FastAPI, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from backend.app.api.v1.router import api_router
-from backend.app.core.config import settings
-from backend.app.core.database import close_db, init_db
-from backend.app.core.exceptions import register_exception_handlers
-from backend.app.core.logging import (
+from app.api.v1.router import api_router
+from app.core.config import settings
+from app.core.database import close_db, init_db
+from app.core.exceptions import register_exception_handlers
+from app.core.logging import (
     RequestContextFilter,
     clear_request_context,
     get_logger,

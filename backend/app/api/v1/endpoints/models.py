@@ -5,9 +5,9 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.database import get_session
-from backend.app.repositories.model_adapter import ModelAdapterRepository
-from backend.app.schemas import ModelAdapterSchema
+from app.core.database import get_session
+from app.repositories.model_adapter import ModelAdapterRepository
+from app.schemas import ModelAdapterSchema
 
 router = APIRouter()
 

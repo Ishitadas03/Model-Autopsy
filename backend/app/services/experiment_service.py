@@ -10,17 +10,17 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.config import settings
-from backend.app.core.database import session_context
-from backend.app.core.exceptions import (
+from app.core.config import settings
+from app.core.database import session_context
+from app.core.exceptions import (
     ConcurrencyLimitError,
     ExperimentAlreadyRunningError,
     ExperimentExecutionError,
     ExperimentNotFoundError,
     InvalidExperimentConfigError,
 )
-from backend.app.core.logging import get_logger
-from backend.app.models.experiment import (
+from app.core.logging import get_logger
+from app.models.experiment import (
     Experiment,
     ExperimentRun,
     ExperimentResult,
@@ -29,17 +29,17 @@ from backend.app.models.experiment import (
     StressType,
     TaskType,
 )
-from backend.app.models.failure_sample import FailedSample
-from backend.app.models.artifact import ArtifactManifest, ArtifactType
-from backend.app.repositories.experiment import (
+from app.models.failure_sample import FailedSample
+from app.models.artifact import ArtifactManifest, ArtifactType
+from app.repositories.experiment import (
     ExperimentRepository,
     ExperimentRunRepository,
     ExperimentResultRepository,
 )
-from backend.app.repositories.failure_sample import FailureSampleRepository
-from backend.app.repositories.artifact import ArtifactRepository
-from backend.app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
-from backend.app.schemas import ExperimentRunRequest
+from app.repositories.failure_sample import FailureSampleRepository
+from app.repositories.artifact import ArtifactRepository
+from app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
+from app.schemas import ExperimentRunRequest
 
 logger = get_logger(__name__)
 

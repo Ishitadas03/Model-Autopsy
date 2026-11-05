@@ -8,7 +8,7 @@ These models ensure seamless serialization and compatibility with frontend-api-c
 from typing import Any, Dict, List, Literal, Optional, Union
 from pydantic import BaseModel, ConfigDict, Field
 
-# Re-export core enums and schemas from model_autopsy
+# Re-export core enums and schemas from the ML engine (single source of truth)
 from model_autopsy.schemas import (
     ApiErrorResponse,
     ArtifactManifestSchema,
@@ -32,7 +32,6 @@ from model_autopsy.schemas import (
     TaskType,
     ValidationErrorItem,
 )
-
 
 # ==========================================
 # Frontend API Contract Compliant Schemas

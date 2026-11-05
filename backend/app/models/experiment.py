@@ -19,13 +19,12 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.core.database import Base
+from app.core.database import Base
 
 if TYPE_CHECKING:
-    from backend.app.models.dataset import Dataset
-    from backend.app.models.model_adapter import ModelAdapter
-    from backend.app.models.failure_sample import FailedSample
-    from backend.app.models.artifact import ArtifactManifest, ArtifactReference
+    from app.models.dataset import Dataset
+    from app.models.failure_sample import FailedSample
+    from app.models.artifact import ArtifactManifest, ArtifactReference
 
 
 class ExperimentStatus(str, enum.Enum):
@@ -73,7 +72,9 @@ class Experiment(Base):
     )  # e.g., "EXP-0241"
     model_name: Mapped[str] = mapped_column(String(200), nullable=False)
     dataset_name: Mapped[str] = mapped_column(String(200), nullable=False)
-    dataset_id: Mapped[str] = mapped_column(String(100), nullable=False, index=True)
+    dataset_id: Mapped[str] = mapped_column(
+        String(100), ForeignKey("datasets.dataset_id"), nullable=False, index=True
+    )
     task_type: Mapped[TaskType] = mapped_column(Enum(TaskType), nullable=False)
     perturbation_family: Mapped[StressType] = mapped_column(Enum(StressType), nullable=False)
     noise_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -102,7 +103,6 @@ class Experiment(Base):
 
     # Relationships
     dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="experiments")
-    model_adapter: Mapped["ModelAdapter"] = relationship("ModelAdapter", back_populates="experiments")
     runs: Mapped[list["ExperimentRun"]] = relationship(
         "ExperimentRun", back_populates="experiment", cascade="all, delete-orphan"
     )

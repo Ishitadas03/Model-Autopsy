@@ -8,12 +8,12 @@ from uuid import UUID
 from fastapi import Response
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
 
-from backend.app.core.config import settings
-from backend.app.core.exceptions import ArtifactNotFoundError
-from backend.app.core.logging import get_logger
-from backend.app.models.artifact import ArtifactManifest, ArtifactType
-from backend.app.repositories.artifact import ArtifactRepository
-from backend.app.repositories.experiment import ExperimentRepository
+from app.core.config import settings
+from app.core.exceptions import ArtifactNotFoundError
+from app.core.logging import get_logger
+from app.models.artifact import ArtifactManifest, ArtifactType
+from app.repositories.artifact import ArtifactRepository
+from app.repositories.experiment import ExperimentRepository
 
 logger = get_logger(__name__)
 

@@ -17,11 +17,10 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
-from backend.app.core.database import Base
+from app.core.database import Base
 
 if TYPE_CHECKING:
-    from backend.app.models.dataset import Dataset
-    from backend.app.models.experiment import Experiment
+    from app.models.dataset import Dataset
 
 
 class ModelAdapter(Base):
@@ -57,7 +56,6 @@ class ModelAdapter(Base):
 
     # Relationships
     dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="model_adapters")
-    experiments: Mapped[list["Experiment"]] = relationship("Experiment", back_populates="model_adapter")
 
     __table_args__ = (
         Index("ix_model_adapters_dataset_active", "dataset_id", "is_active"),

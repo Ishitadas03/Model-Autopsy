@@ -6,8 +6,8 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.models.dataset import Dataset
-from backend.app.repositories.base import BaseRepository
+from app.models.dataset import Dataset
+from app.repositories.base import BaseRepository
 
 
 class DatasetRepository(BaseRepository[Dataset]):

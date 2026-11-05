@@ -5,9 +5,9 @@ from typing import List
 from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.database import get_session
-from backend.app.repositories.dataset import DatasetRepository
-from backend.app.schemas import DatasetSchema
+from app.core.database import get_session
+from app.repositories.dataset import DatasetRepository
+from app.schemas import DatasetSchema
 
 router = APIRouter()
 

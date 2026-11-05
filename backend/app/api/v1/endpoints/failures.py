@@ -6,10 +6,10 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.database import get_session
-from backend.app.repositories.experiment import ExperimentRepository
-from backend.app.repositories.failure_sample import FailureSampleRepository
-from backend.app.schemas import FailedSample, ExperimentSummarySchema
+from app.core.database import get_session
+from app.repositories.experiment import ExperimentRepository
+from app.repositories.failure_sample import FailureSampleRepository
+from app.schemas import FailedSample, ExperimentSummarySchema
 
 router = APIRouter()
 

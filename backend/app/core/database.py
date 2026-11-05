@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase
 from sqlalchemy.pool import NullPool
 
-from backend.app.core.config import settings
+from app.core.config import settings
 
 
 class Base(DeclarativeBase):
@@ -61,7 +61,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 async def init_db() -> None:
     """Initialize database - create all tables."""
     # Import all models to register them
-    from backend.app.models import (  # noqa: F401
+    from app.models import (  # noqa: F401
         experiment,
         dataset,
         model_adapter,

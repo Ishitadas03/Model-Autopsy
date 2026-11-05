@@ -296,6 +296,7 @@ class MLEngineBridge:
             output_dir / "aggregate_comparison.json",
             output_dir / "results.json",
             output_dir / "failure_patterns_summary.json",
+            output_dir / "metrics.json",
         ]:
             if candidate.exists():
                 try:
@@ -316,17 +317,25 @@ class MLEngineBridge:
         stats = None
 
         if data:
-            if "baseline_macro_f1" in data:
-                baseline_f1 = data.get("baseline_macro_f1")
-            elif "baseline_metrics" in data and isinstance(data["baseline_metrics"], dict):
-                baseline_f1 = data["baseline_metrics"].get("f1") or data["baseline_metrics"].get("macro_f1", 0.958)
+            target_data = data
+            if "models" in data and isinstance(data["models"], dict):
+                first_model = list(data["models"].values())[0]
+                if isinstance(first_model, dict) and "corruptions" in first_model and isinstance(first_model["corruptions"], dict):
+                    target_data = list(first_model["corruptions"].values())[0]
+            elif "corruptions" in data and isinstance(data["corruptions"], dict):
+                target_data = list(data["corruptions"].values())[0]
 
-            observed_boundary = data.get("observed_failure_boundary") or data.get("observed_boundary") or data.get("mean_observed_boundary")
+            if "baseline_macro_f1" in target_data:
+                baseline_f1 = target_data.get("baseline_macro_f1")
+            elif "baseline_metrics" in target_data and isinstance(target_data["baseline_metrics"], dict):
+                baseline_f1 = target_data["baseline_metrics"].get("f1") or target_data["baseline_metrics"].get("macro_f1", 0.958)
+
+            observed_boundary = target_data.get("observed_failure_boundary") or target_data.get("observed_boundary") or target_data.get("mean_observed_boundary")
 
             # Parse severity aggregates into curve data
-            if "severity_aggregates" in data and isinstance(data["severity_aggregates"], list):
+            if "severity_aggregates" in target_data and isinstance(target_data["severity_aggregates"], list):
                 worst_case_val = baseline_f1
-                for agg in data["severity_aggregates"]:
+                for agg in target_data["severity_aggregates"]:
                     sev = agg.get("severity", 0.0)
                     f1_mean = agg.get("macro_f1", {}).get("mean", 0.0) if isinstance(agg.get("macro_f1"), dict) else agg.get("macro_f1", 0.0)
                     acc_mean = agg.get("accuracy", {}).get("mean", 0.0) if isinstance(agg.get("accuracy"), dict) else agg.get("accuracy", 0.0)
@@ -342,8 +351,8 @@ class MLEngineBridge:
                     })
                 worst_case_f1 = worst_case_val
 
-            elif "severity_results" in data and isinstance(data["severity_results"], list):
-                for item in data["severity_results"]:
+            elif "severity_results" in target_data and isinstance(target_data["severity_results"], list):
+                for item in target_data["severity_results"]:
                     sev = item.get("severity", 0.0)
                     f1_val = item.get("macro_f1", 0.0)
                     acc_val = item.get("accuracy", 0.0)

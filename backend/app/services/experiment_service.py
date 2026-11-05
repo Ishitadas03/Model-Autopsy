@@ -209,8 +209,19 @@ class ExperimentService:
     def _to_stress_type(self, val: Optional[str]) -> StressType:
         if not val:
             return StressType.GAUSSIAN_NOISE
+        v = str(val).lower()
+        if "missing" in v:
+            return StressType.MISSINGNESS
+        if "outlier" in v:
+            return StressType.OUTLIERS
+        if "poison" in v or "pattern" in v:
+            return StressType.POISONING
+        if "adversarial" in v or "vulnerab" in v:
+            return StressType.ADVERSARIAL
+        if "shift" in v or "covariate" in v:
+            return StressType.COVARIATE_SHIFT
         try:
-            return StressType(val.lower())
+            return StressType(v)
         except (ValueError, AttributeError):
             return StressType.GAUSSIAN_NOISE
 
@@ -223,16 +234,26 @@ class ExperimentService:
             return StressMode.INCREMENTAL
 
     def _get_experiment_type(self, perturbation_family: str) -> str:
-        """Map perturbation family to experiment runner script."""
+        """Map perturbation family or experiment id to experiment runner script."""
+        val = str(perturbation_family).lower()
+        if val in ("e001", "e002", "e003", "e004", "e005", "e006"):
+            return val
         mapping = {
             "gaussian_noise": "e001",
             "mcar_missingness": "e002",
-            "outlier_contamination": "e003",
+            "missingness": "e002",
             "multi_corruption": "e002",
+            "outlier_contamination": "e003",
+            "outliers": "e003",
             "cross_model": "e003",
             "failure_patterns": "e004",
+            "poisoning": "e004",
+            "feature_vulnerability": "e005",
+            "adversarial": "e005",
+            "covariate_shift": "e006",
+            "distribution_shift": "e006",
         }
-        return mapping.get(str(perturbation_family).lower(), "e001")
+        return mapping.get(val, "e001")
 
     def _generate_config_yaml(
         self,

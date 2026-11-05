@@ -83,10 +83,24 @@ async def get_experiment_artifact(
     # 2. Check canonical aliases if exact target does not exist
     if not (target_path.exists() and target_path.is_file()):
         aliases = {
-            "results.json": ["aggregate_comparison.json", "aggregate_results.json", "results.json"],
-            "curves.csv": ["aggregate_comparison.csv", "aggregate_results.csv", "results.csv", "curves.csv"],
+            "results.json": [
+                "aggregate_comparison.json",
+                "aggregate_results.json",
+                "results.json",
+                "failure_patterns_summary.json",
+                "metrics.json",
+            ],
+            "curves.csv": [
+                "aggregate_comparison.csv",
+                "aggregate_results.csv",
+                "results.csv",
+                "curves.csv",
+                "sample_level_metrics.csv",
+                "feature_vulnerability_summary.csv",
+                "shift_summary.csv",
+            ],
             "report.md": ["report.md"],
-            "manifest.json": ["manifest.json"],
+            "manifest.json": ["manifest.json", "reproducibility_manifest.json"],
         }
         for cand in aliases.get(artifact_type.lower(), []):
             cand_p = (exp_dir / cand).resolve()

@@ -7,8 +7,8 @@ from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.app.models.experiment import Experiment, ExperimentRun, ExperimentResult, ExperimentStatus
-from backend.app.repositories.base import BaseRepository
+from app.models.experiment import Experiment, ExperimentRun, ExperimentResult, ExperimentStatus
+from app.repositories.base import BaseRepository
 
 
 class ExperimentRepository(BaseRepository[Experiment]):

@@ -7,8 +7,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from backend.app.models.artifact import ArtifactManifest, ArtifactReference, ArtifactType
-from backend.app.repositories.base import BaseRepository
+from app.models.artifact import ArtifactManifest, ArtifactReference, ArtifactType
+from app.repositories.base import BaseRepository
 
 
 class ArtifactRepository(BaseRepository[ArtifactManifest]):

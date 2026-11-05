@@ -12,11 +12,11 @@ from alembic import context
 # Add backend to path so we can import models
 sys.path.append(str(Path(__file__).resolve().parents[2]))
 
-from backend.app.core.config import settings
-from backend.app.core.database import Base
+from app.core.config import settings
+from app.core.database import Base
 
 # Import all models to register them with Base.metadata
-from backend.app.models import (  # noqa: F401
+from app.models import (  # noqa: F401
     experiment,
     dataset,
     model_adapter,

@@ -21,10 +21,10 @@ sys.path.insert(0, str(project_root))
 sys.path.insert(0, str(ml_engine_src))
 sys.path.insert(0, str(backend_dir))
 
-from backend.app.core.config import settings
-from backend.app.core.database import Base, get_session
-from backend.app.main import create_app
-from backend.app.models import (  # noqa: F401
+from app.core.config import settings
+from app.core.database import Base, get_session
+from app.main import create_app
+from app.models import (  # noqa: F401
     experiment,
     dataset,
     model_adapter,
@@ -66,7 +66,7 @@ async def test_session(test_engine) -> AsyncGenerator[AsyncSession, None]:
 @pytest_asyncio.fixture
 async def client(test_session) -> AsyncGenerator[AsyncClient, None]:
     """Create test client with dependency override."""
-    from backend.app.main import app
+    from app.main import app
 
     async def override_get_session():
         yield test_session
@@ -83,7 +83,7 @@ async def client(test_session) -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture
 async def seed_datasets(test_session):
     """Seed default datasets."""
-    from backend.app.repositories.dataset import DatasetRepository
+    from app.repositories.dataset import DatasetRepository
 
     repo = DatasetRepository(test_session)
     await repo.seed_default_datasets()
@@ -93,7 +93,7 @@ async def seed_datasets(test_session):
 @pytest.fixture
 async def seed_models(test_session, seed_datasets):
     """Seed default model adapters."""
-    from backend.app.repositories.model_adapter import ModelAdapterRepository
+    from app.repositories.model_adapter import ModelAdapterRepository
 
     repo = ModelAdapterRepository(test_session)
     await repo.seed_default_adapters()
@@ -103,8 +103,8 @@ async def seed_models(test_session, seed_datasets):
 @pytest.fixture
 async def seed_experiment(test_session, seed_datasets, seed_models):
     """Seed a sample experiment with runs, results, and failed samples."""
-    from backend.app.models.experiment import Experiment, ExperimentRun, ExperimentResult, ExperimentStatus, TaskType, StressType, StressMode
-    from backend.app.models.failure_sample import FailedSample
+    from app.models.experiment import Experiment, ExperimentRun, ExperimentResult, ExperimentStatus, TaskType, StressType, StressMode
+    from app.models.failure_sample import FailedSample
 
     exp = Experiment(
         experiment_id="EXP-0241",

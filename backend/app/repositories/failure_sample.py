@@ -6,8 +6,8 @@ from uuid import UUID
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.models.failure_sample import FailedSample
-from backend.app.repositories.base import BaseRepository
+from app.models.failure_sample import FailedSample
+from app.repositories.base import BaseRepository
 
 
 class FailureSampleRepository(BaseRepository[FailedSample]):

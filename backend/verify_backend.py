@@ -26,7 +26,7 @@ print("==================================================")
 
 # 1. Config & Paths
 print("\n[PHASE 1] Checking Core Configuration & Paths...")
-from backend.app.core.config import settings
+from app.core.config import settings
 print(f" - App: {settings.APP_NAME} v{settings.APP_VERSION}")
 print(f" - Artifacts dir: {settings.ARTIFACTS_BASE_DIR} (exists: {settings.ARTIFACTS_BASE_DIR.exists()})")
 print(f" - Configs dir: {settings.CONFIGS_BASE_DIR} (exists: {settings.CONFIGS_BASE_DIR.exists()})")
@@ -36,8 +36,8 @@ assert settings.ARTIFACTS_BASE_DIR.exists(), "Artifacts base dir must exist"
 
 # 2. Database Models & Schema Metadata
 print("\n[PHASE 2] Checking SQLAlchemy 2.0 ORM Models...")
-from backend.app.core.database import Base
-from backend.app.models import (
+from app.core.database import Base
+from app.models import (
     experiment,
     dataset,
     model_adapter,
@@ -56,7 +56,7 @@ print(" - All 8 required database tables mapped successfully!")
 
 # 3. Schemas & Contract Matching
 print("\n[PHASE 3] Checking Pydantic v2 Schemas...")
-from backend.app.schemas import (
+from app.schemas import (
     ExperimentSummarySchema,
     ExperimentDetailSchema,
     ExperimentRunRequest,
@@ -72,7 +72,7 @@ print(" - Schemas imported and verified with frontend contract.")
 
 # 4. ML Engine Bridge & Runners
 print("\n[PHASE 4] Checking ML Engine Bridge...")
-from backend.app.services.ml_engine_bridge import MLEngineBridge
+from app.services.ml_engine_bridge import MLEngineBridge
 bridge = MLEngineBridge()
 for exp_type in ["E001", "E002", "E003", "E004"]:
     script_path = bridge._get_script_path(exp_type)
@@ -81,7 +81,7 @@ for exp_type in ["E001", "E002", "E003", "E004"]:
 
 # 5. Artifact Serving
 print("\n[PHASE 5] Checking Canonical Artifact Serving (E003)...")
-from backend.app.services.artifact_service import ArtifactService
+from app.services.artifact_service import ArtifactService
 
 service = ArtifactService(None)
 # Drive coroutine directly without network/socket loop
@@ -111,7 +111,7 @@ assert len(md_res.body) > 0
 
 # 6. Scientific Invariants Enforcement
 print("\n[PHASE 6] Checking Scientific Invariants Enforcement...")
-from backend.app.main import _inject_scientific_caveats
+from app.main import _inject_scientific_caveats
 test_payload = {
     "observed_boundary": 0.231,
     "robustness_score": 0.88,
@@ -138,9 +138,9 @@ for forbidden in ["robustness_score", "overall_score", "letter_grade", "subjecti
 print(" - Invariant 3 verified: Forbidden aggregate scores/grades stripped.")
 
 # Verify Invariant 4: Metric polarity validation
-from backend.app.services.experiment_service import ExperimentService
-from backend.app.schemas import ExperimentRunRequest
-from backend.app.core.exceptions import InvalidExperimentConfigError
+from app.services.experiment_service import ExperimentService
+from app.schemas import ExperimentRunRequest
+from app.core.exceptions import InvalidExperimentConfigError
 
 exp_service = ExperimentService(None)
 exp_service._validate_metric_polarity(ExperimentRunRequest(dataset_id="german-credit", task_type="classification", evaluation_metric="f1", failure_threshold=0.8))
@@ -155,7 +155,7 @@ print(" - Invariant 4 verified: Metric polarity strictly enforced.")
 
 # 7. FastAPI App & Routes
 print("\n[PHASE 7] Checking FastAPI Application & Routes...")
-from backend.app.main import app
+from app.main import app
 routes = [route.path for route in app.routes]
 print(f" - Registered routes ({len(routes)}):")
 for path in sorted(set(routes)):

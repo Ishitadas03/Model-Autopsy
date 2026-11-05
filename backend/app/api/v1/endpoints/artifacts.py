@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.config import settings
-from backend.app.core.database import get_session
-from backend.app.repositories.artifact import ArtifactRepository
-from backend.app.repositories.experiment import ExperimentRepository
+from app.core.config import settings
+from app.core.database import get_session
+from app.repositories.artifact import ArtifactRepository
+from app.repositories.experiment import ExperimentRepository
 
 router = APIRouter()
 
@@ -30,7 +30,7 @@ async def get_e003_artifact(
     session: AsyncSession = Depends(get_session),
 ):
     """Get E003 canonical experiment artifact in specified format."""
-    from backend.app.services.artifact_service import ArtifactService
+    from app.services.artifact_service import ArtifactService
 
     service = ArtifactService(session)
     return await service.get_e003_artifact(format)
@@ -45,8 +45,8 @@ async def get_experiment_artifact(
     session: AsyncSession = Depends(get_session),
 ):
     """Get experiment artifact by type."""
-    from backend.app.services.artifact_service import ArtifactService
-    from backend.app.core.exceptions import ArtifactNotFoundError
+    from app.services.artifact_service import ArtifactService
+    from app.core.exceptions import ArtifactNotFoundError
 
     exp_repo = ExperimentRepository(session)
 

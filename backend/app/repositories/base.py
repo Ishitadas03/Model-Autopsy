@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
-from backend.app.core.database import Base
+from app.core.database import Base
 
 ModelType = TypeVar("ModelType", bound=Base)
 

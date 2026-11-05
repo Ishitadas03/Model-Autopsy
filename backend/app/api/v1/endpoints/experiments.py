@@ -6,9 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.core.database import get_session
-from backend.app.repositories.experiment import ExperimentRepository, ExperimentRunRepository, ExperimentResultRepository
-from backend.app.schemas import (
+from app.core.database import get_session
+from app.repositories.experiment import ExperimentRepository, ExperimentRunRepository, ExperimentResultRepository
+from app.schemas import (
     ExperimentSummarySchema,
     ExperimentDetailSchema,
     ExperimentRunRequest,
@@ -79,7 +79,7 @@ async def create_experiment(
     session: AsyncSession = Depends(get_session),
 ) -> ExperimentDetailSchema:
     """Submit a new stress-testing autopsy job."""
-    from backend.app.services.experiment_service import ExperimentService
+    from app.services.experiment_service import ExperimentService
 
     service = ExperimentService(session)
     experiment = await service.create_experiment(request)
@@ -92,8 +92,8 @@ async def cancel_experiment(
     session: AsyncSession = Depends(get_session),
 ) -> ExperimentCancelResponse:
     """Request cancellation of an actively running or queued experiment."""
-    from backend.app.services.experiment_service import ExperimentService
-    from backend.app.core.exceptions import ExperimentNotFoundError
+    from app.services.experiment_service import ExperimentService
+    from app.core.exceptions import ExperimentNotFoundError
 
     service = ExperimentService(session)
 

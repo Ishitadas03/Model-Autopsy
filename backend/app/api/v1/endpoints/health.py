@@ -17,7 +17,7 @@ async def health_check(request: Request, session: AsyncSession = Depends(get_ses
     # Check database connectivity
     db_status = "ok"
     try:
-        await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=1.0)
+        await asyncio.wait_for(session.execute(text("SELECT 1")), timeout=4.0)
     except Exception:
         db_status = "error"
 

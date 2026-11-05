@@ -45,7 +45,7 @@ class ArtifactManifest(Base):
     experiment_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("experiments.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    artifact_type: Mapped[ArtifactType] = mapped_column(Enum(ArtifactType), nullable=False)
+    artifact_type: Mapped[ArtifactType] = mapped_column(Enum(ArtifactType, native_enum=False), nullable=False)
     seed: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # Null for aggregated artifacts
     file_path: Mapped[str] = mapped_column(String(500), nullable=False)  # Relative to artifacts base dir
     file_name: Mapped[str] = mapped_column(String(200), nullable=False)

@@ -80,18 +80,18 @@ class Experiment(Base):
     dataset_id: Mapped[str] = mapped_column(
         String(100), ForeignKey("datasets.dataset_id"), nullable=False, index=True
     )
-    task_type: Mapped[TaskType] = mapped_column(Enum(TaskType), nullable=False)
-    perturbation_family: Mapped[StressType] = mapped_column(Enum(StressType), nullable=False)
+    task_type: Mapped[TaskType] = mapped_column(Enum(TaskType, native_enum=False), nullable=False)
+    perturbation_family: Mapped[StressType] = mapped_column(Enum(StressType, native_enum=False), nullable=False)
     noise_type: Mapped[str] = mapped_column(String(100), nullable=False)
     evaluation_metric: Mapped[str] = mapped_column(String(50), nullable=False)
     failure_threshold: Mapped[float] = mapped_column(nullable=False)
     seed: Mapped[int] = mapped_column(Integer, nullable=False)
-    stress_mode: Mapped[StressMode] = mapped_column(Enum(StressMode), default=StressMode.INCREMENTAL)
+    stress_mode: Mapped[StressMode] = mapped_column(Enum(StressMode, native_enum=False), default=StressMode.INCREMENTAL)
     severity_levels: Mapped[list] = mapped_column(JSON, nullable=False)  # List of severity values
     seeds: Mapped[list] = mapped_column(JSON, nullable=False)  # List of seeds for multi-seed
     config_yaml: Mapped[str] = mapped_column(Text, nullable=False)  # Full YAML config
     status: Mapped[ExperimentStatus] = mapped_column(
-        Enum(ExperimentStatus), default=ExperimentStatus.QUEUED, nullable=False, index=True
+        Enum(ExperimentStatus, native_enum=False), default=ExperimentStatus.QUEUED, nullable=False, index=True
     )
     progress_percent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     current_seed_index: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
@@ -150,7 +150,7 @@ class ExperimentRun(Base):
     seed: Mapped[int] = mapped_column(Integer, nullable=False)
     run_index: Mapped[int] = mapped_column(Integer, nullable=False)  # 0-based index in seeds list
     status: Mapped[ExperimentStatus] = mapped_column(
-        Enum(ExperimentStatus), default=ExperimentStatus.QUEUED, nullable=False
+        Enum(ExperimentStatus, native_enum=False), default=ExperimentStatus.QUEUED, nullable=False
     )
     progress_percent: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     current_severity: Mapped[Optional[float]] = mapped_column(nullable=True)

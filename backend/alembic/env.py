@@ -9,8 +9,14 @@ from sqlalchemy.ext.asyncio import async_engine_from_config
 
 from alembic import context
 
-# Add backend to path so we can import models
-sys.path.append(str(Path(__file__).resolve().parents[2]))
+# Prepend backend and project root to sys.path so Model Autopsy takes precedence over any other installed packages
+backend_dir = Path(__file__).resolve().parents[1]
+project_root = backend_dir.parent
+
+if str(backend_dir) not in sys.path:
+    sys.path.insert(0, str(backend_dir))
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
 
 from app.core.config import settings
 from app.core.database import Base
@@ -33,8 +39,11 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Set the SQLAlchemy URL from settings
-config.set_main_option("sqlalchemy.url", settings.database_url_sync)
+# Set the SQLAlchemy URL from settings (async URL for online async engine, sync for offline)
+if context.is_offline_mode():
+    config.set_main_option("sqlalchemy.url", settings.database_url_sync)
+else:
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
 # Add your model's MetaData object here for 'autogenerate' support
 target_metadata = Base.metadata
@@ -71,10 +80,17 @@ def do_run_migrations(connection: Connection) -> None:
 
 async def run_async_migrations() -> None:
     """Run migrations in 'online' mode with async engine."""
+    connect_args = {}
+    if "postgresql" in settings.DATABASE_URL:
+        connect_args = {"timeout": 10.0, "command_timeout": 15.0}
+        if any(k in settings.DATABASE_URL for k in ["supabase", "pooler", "sslmode=require", "render.com"]):
+            connect_args["ssl"] = "require"
+
     connectable = async_engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
+        connect_args=connect_args,
     )
 
     async with connectable.connect() as connection:

@@ -329,8 +329,15 @@ class MLEngineBridge:
                 baseline_f1 = target_data.get("baseline_macro_f1")
             elif "baseline_metrics" in target_data and isinstance(target_data["baseline_metrics"], dict):
                 baseline_f1 = target_data["baseline_metrics"].get("f1") or target_data["baseline_metrics"].get("macro_f1", 0.958)
+            elif "per_seed_results" in target_data and isinstance(target_data["per_seed_results"], dict):
+                for s_data in target_data["per_seed_results"].values():
+                    if isinstance(s_data, dict) and "baseline_macro_f1" in s_data:
+                        baseline_f1 = s_data["baseline_macro_f1"]
+                        break
 
             observed_boundary = target_data.get("observed_failure_boundary") or target_data.get("observed_boundary") or target_data.get("mean_observed_boundary")
+            if "feature_vulnerabilities" in target_data and isinstance(target_data["feature_vulnerabilities"], list):
+                feature_vulns = target_data["feature_vulnerabilities"]
 
             # Parse severity aggregates into curve data
             if "severity_aggregates" in target_data and isinstance(target_data["severity_aggregates"], list):

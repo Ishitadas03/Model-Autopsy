@@ -46,14 +46,30 @@ async def get_dataset(
 
 
 def _dataset_to_schema(dataset) -> DatasetSchema:
-    """Convert Dataset model to DatasetSchema."""
+    """Convert Dataset model to DatasetSchema with structured features list."""
+    features = []
+    if dataset.feature_names:
+        for f in dataset.feature_names:
+            if isinstance(f, dict):
+                features.append(f)
+            else:
+                features.append({
+                    "name": str(f),
+                    "type": "numeric",
+                    "missingCount": 0,
+                })
+
+    class_cnt = len(dataset.class_names) if dataset.class_names else None
+
     return DatasetSchema(
         id=dataset.dataset_id,
         name=dataset.name,
-        description=dataset.description,
+        description=dataset.description or "",
         taskType=dataset.task_type,
         sampleCount=dataset.sample_count,
         featureCount=dataset.feature_count,
+        classCount=class_cnt,
         license=dataset.license,
         tags=dataset.tags or [],
+        features=features,
     )

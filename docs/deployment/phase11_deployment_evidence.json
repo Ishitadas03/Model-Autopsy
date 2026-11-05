@@ -1,0 +1,61 @@
+{
+  "phase": "Phase 11 — End-to-End Production Deployment & Live Verification",
+  "timestamp": "2026-11-05T12:12:00Z",
+  "project": {
+    "name": "Model Autopsy — Find Out Why AI Models Fail",
+    "repository": "https://github.com/Ishitadas03/Model-Autopsy.git",
+    "branch": "main",
+    "architecture": {
+      "frontend": "Vercel (Next.js 14)",
+      "backend": "Render (FastAPI / Python 3.11)",
+      "database": "Supabase (PostgreSQL with PgBouncer)",
+      "storage": "Cloudflare R2 (S3-compatible Object Storage)"
+    }
+  },
+  "verification_suite": {
+    "total_tests_passing": 185,
+    "breakdown": {
+      "ml_engine": {
+        "passed": 116,
+        "failed": 0,
+        "runner": "pytest 9.1.1",
+        "duration_seconds": 39.96
+      },
+      "backend": {
+        "passed": 29,
+        "failed": 0,
+        "runner": "pytest 9.1.1 (asyncio)",
+        "duration_seconds": 10.00
+      },
+      "frontend": {
+        "passed": 40,
+        "failed": 0,
+        "runner": "vitest 1.3.1",
+        "duration_seconds": 4.15
+      }
+    }
+  },
+  "deployment_artifacts": {
+    "render_config": "render.yaml",
+    "vercel_config": "frontend/vercel.json",
+    "backend_requirements": "backend/requirements-prod.txt",
+    "storage_service": "backend/app/services/storage_service.py",
+    "next_config": "frontend/next.config.js"
+  },
+  "runtime_invariants": {
+    "strict_failure_threshold": "Macro-F1 < 0.80",
+    "degradation_alert_threshold": "relative_degradation > 0.15",
+    "max_concurrent_experiments": 1,
+    "memory_budget_mb": 512,
+    "database_connection_pool": 5,
+    "r2_signed_url_ttl_seconds": 3600
+  },
+  "ui_hardening": {
+    "defect": "ECG pulse logo expanding to full viewport width",
+    "root_cause": "Unstyled SVG in Next.js SSR before Tailwind utility stylesheet compilation",
+    "fix_applied": "Added explicit width and height HTML attributes to SVG in frontend/components/ui/Logo.tsx",
+    "verified": true
+  },
+  "audit_verdict": "READY FOR CLOUD DASHBOARD CONNECTION"
+}
+

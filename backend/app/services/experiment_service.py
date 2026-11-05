@@ -414,6 +414,7 @@ class ExperimentService:
             except ValueError:
                 art_type_enum = ArtifactType.RESULTS_JSON
 
+            mime_type = self._get_mime_type(art["file_name"])
             await artifact_repo.create(
                 experiment_id=experiment_db_id,
                 artifact_type=art_type_enum,
@@ -422,8 +423,17 @@ class ExperimentService:
                 file_name=art["file_name"],
                 file_size_bytes=art["file_size"],
                 content_hash=content_hash,
-                mime_type=self._get_mime_type(art["file_name"]),
+                mime_type=mime_type,
             )
+
+            # Replicate artifact to Cloudflare R2 object storage if configured
+            try:
+                from backend.app.services.storage_service import storage_service
+                if storage_service.is_configured() and file_path_obj.exists():
+                    r2_key = f"experiments/{experiment.experiment_id}/{art['file_name']}"
+                    storage_service.upload_file(file_path_obj, r2_key, mime_type)
+            except Exception as e:
+                logger.warning(f"R2 storage upload skipped or failed for {art.get('file_name')}: {e}")
 
         # Store failed samples
         for s in failed_samples:

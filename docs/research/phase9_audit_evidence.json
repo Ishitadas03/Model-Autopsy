@@ -1,0 +1,259 @@
+{
+  "timestamp": "2026-11-05T08:39:04.074562+00:00",
+  "environment": {
+    "os": "Windows 11 (10.0.26200)",
+    "python": "3.13.5",
+    "fastapi": "0.121.2",
+    "pydantic": "2.12.4",
+    "sqlalchemy": "2.0.51",
+    "backend_url": "http://127.0.0.1:8000",
+    "frontend_url": "http://localhost:3000"
+  },
+  "tests": {
+    "test1_backend_database": {
+      "backend_health_v1": {
+        "status_code": 200,
+        "body": {
+          "status": "ok",
+          "mode": "live",
+          "version": "0.1.0",
+          "database": "ok"
+        },
+        "pass": true
+      },
+      "backend_health_root": {
+        "status_code": 200,
+        "body": {
+          "status": "ok",
+          "mode": "live",
+          "version": "0.1.0",
+          "database": "ok"
+        },
+        "pass": true
+      },
+      "orm_tables": {
+        "discovered_tables": [
+          "artifact_manifests",
+          "artifact_references",
+          "datasets",
+          "experiment_results",
+          "experiment_runs",
+          "experiments",
+          "failed_samples",
+          "model_adapters"
+        ],
+        "missing": [],
+        "pass": true
+      },
+      "database_crud": {
+        "create_read": true,
+        "update": true,
+        "delete": true,
+        "pass": true
+      },
+      "error_responses": {
+        "status_code": 404,
+        "envelope_has_error": true,
+        "envelope_has_detail": true,
+        "pass": true
+      }
+    },
+    "test2_experiment_api": {
+      "get_experiments": {
+        "status_code": 200,
+        "count": 5,
+        "pass": true
+      },
+      "get_e003_canonical": {
+        "status_code": 200,
+        "keys": [
+          "experiment_id",
+          "protocol_version",
+          "timestamp_utc",
+          "dataset_metadata",
+          "models_metadata",
+          "seeds_config",
+          "failure_threshold",
+          "models"
+        ],
+        "pass": true
+      },
+      "post_experiments_run": {
+        "status_code": 201,
+        "created_id": "EXP-0006",
+        "pass": true
+      },
+      "get_experiment_by_id": {
+        "status_code": 200,
+        "id": "EXP-0006",
+        "status": "queued",
+        "pass": true
+      },
+      "post_cancel": {
+        "status_code": 200,
+        "body": {
+          "success": true,
+          "experimentId": "EXP-0006",
+          "status": "cancelled",
+          "message": "Experiment EXP-0006 terminated successfully.",
+          "terminatedPid": null,
+          "confirmedStopped": true
+        },
+        "pass": true
+      },
+      "artifact_streaming": {
+        "results_json_status": 200,
+        "csv_status": 200,
+        "csv_has_content": true,
+        "markdown_status": 200,
+        "markdown_has_content": true,
+        "pass": true
+      }
+    },
+    "test3_ml_engine_execution": {
+      "runner_availability_e001_e006": {
+        "scripts": {
+          "run_e001.py": true,
+          "run_e002.py": true,
+          "run_e003.py": true,
+          "run_e004.py": true,
+          "run_e005.py": true,
+          "run_e006.py": true
+        },
+        "pass": true
+      },
+      "real_experiment_execution": {
+        "job_id": "EXP-0007",
+        "submission_status": 201,
+        "lifecycle_states_observed": [
+          "queued",
+          "running",
+          "completed"
+        ],
+        "final_status": "completed",
+        "artifacts_created": [
+          "baseline_metrics.json",
+          "config.yaml",
+          "confusion_matrices",
+          "failure_analysis.json",
+          "manifest.json",
+          "report.md",
+          "results.csv",
+          "results.json",
+          "robustness_curve.json",
+          "robustness_curve.png",
+          "severity_metrics.csv"
+        ],
+        "pass": true
+      }
+    },
+    "test4_queue_cancellation": {
+      "queue_and_concurrency": {
+        "submitted_jobs": [
+          "EXP-0008"
+        ],
+        "concurrency_limit_429_enforced": true,
+        "observed_statuses": [
+          "running"
+        ],
+        "cancellation_response": {
+          "status_code": 200,
+          "confirmed_stopped": true,
+          "status": "cancelled"
+        },
+        "pass": true
+      }
+    },
+    "test5_scientific_integrity": {
+      "scientific_invariants": {
+        "boundary_caveat_verified": true,
+        "strict_threshold_less_than": true,
+        "relative_degradation_alert_15pct": true,
+        "forbidden_fields_absent": true,
+        "found_forbidden": [],
+        "metric_polarity_strictly_enforced": true,
+        "canonical_artifacts_verified": true,
+        "canonical_hashes": {
+          "artifacts\\experiments\\E001\\results.json": "c45d608e532c1d830160d2474ed4c8f365faed047295ad4c8dffc15d99c7af28",
+          "artifacts\\experiments\\E001_multi_seed\\aggregate_results.json": "b6f2d57f7547d196315ec5fa4fedcaa8a98fed3e0d2d0369df241dc221338374",
+          "artifacts\\experiments\\E003\\aggregate_comparison.json": "85d56a74da5cb2b76449569471cf1da93185fd12e6d90d1a938dec001366c044",
+          "artifacts\\experiments\\E003\\manifest.json": "ae939e68e9ae096eb9dfab9ac672d7611f660887175a24e887e68dfced25ae78",
+          "artifacts\\experiments\\E004\\sample_level_metrics.csv": "f7957019fa7cedf978458296a08f43e92bf8432211ab9150f0ab598862e80600",
+          "artifacts\\experiments\\E005\\feature_rankings.json": "84e2435e7adccca0204eef02ecd0ef221e1de6f1da52461069d58c3518c321e2",
+          "artifacts\\experiments\\E006\\shift_comparisons.json": "3ed3a79b1d6d2274c2e6a15555833fdc39be62bbf64413c5fd77dd36b899d74e"
+        },
+        "pass": true
+      }
+    },
+    "test6_frontend_integration": {
+      "frontend_pages": {
+        "routes": {
+          "/": {
+            "status_code": 200,
+            "has_content": true
+          },
+          "/workspace": {
+            "status_code": 200,
+            "has_content": true
+          },
+          "/experiments": {
+            "status_code": 200,
+            "has_content": true
+          },
+          "/docs": {
+            "status_code": 200,
+            "has_content": true
+          },
+          "/experiments/E003/results": {
+            "status_code": 200,
+            "has_content": true
+          }
+        },
+        "proxy_connectivity": true,
+        "mock_references_in_src": [
+          "lib\\api.ts",
+          "tests\\unit\\e003-workspace.test.ts",
+          "tests\\unit\\mocks.test.ts",
+          "lib\\mocks\\datasets.ts",
+          "lib\\mocks\\experiments.ts",
+          "lib\\mocks\\models.ts",
+          "components\\layout\\CommandStatus.tsx",
+          "components\\workspace\\Step1Dataset.tsx",
+          "components\\workspace\\Step2Model.tsx",
+          "app\\reports\\page.tsx",
+          "app\\experiments\\[id]\\failures\\page.tsx"
+        ],
+        "pass": true
+      }
+    },
+    "test7_regression_security": {
+      "security_checks": {
+        "path_traversal_rejected": true,
+        "traversal_status_code": 404,
+        "forbidden_extension_rejected": true,
+        "extension_status_code": 404,
+        "leaked_secrets_count": 0,
+        "pass": true
+      },
+      "regression_suites": {
+        "ml_engine_tests": {
+          "total": 116,
+          "passed": 116,
+          "failed": 0
+        },
+        "backend_tests": {
+          "total": 29,
+          "passed": 29,
+          "failed": 0
+        },
+        "frontend_tests": {
+          "total": 40,
+          "passed": 40,
+          "failed": 0
+        },
+        "pass": true
+      }
+    }
+  },
+  "verdict": "PASS"
+}

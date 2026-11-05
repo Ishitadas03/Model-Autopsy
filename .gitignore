@@ -83,3 +83,10 @@ Thumbs.db
 tmp/
 temp/
 *.tmp
+
+# SQLite Databases
+*.db
+*.db-shm
+*.db-wal
+
+artifacts/experiments/EXP-*/

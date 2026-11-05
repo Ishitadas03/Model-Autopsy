@@ -13,6 +13,12 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
     lg: 'w-6 h-6',
   };
 
+  const pixelDimensions = {
+    sm: 16,
+    md: 20,
+    lg: 24,
+  };
+
   const textSizes = {
     sm: 'text-xs',
     md: 'text-sm',
@@ -29,6 +35,8 @@ export function Logo({ className = '', size = 'md' }: LogoProps) {
         {/* ECG pulse line mark */}
         <svg
           viewBox="0 0 24 24"
+          width={pixelDimensions[size]}
+          height={pixelDimensions[size]}
           fill="none"
           stroke="currentColor"
           strokeWidth="2"

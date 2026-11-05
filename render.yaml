@@ -1,0 +1,48 @@
+services:
+  - type: web
+    name: model-autopsy-backend
+    runtime: python
+    plan: free
+    region: oregon
+    buildCommand: "pip install --upgrade pip && pip install -r backend/requirements-prod.txt"
+    startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
+    healthCheckPath: /health
+    autoDeploy: true
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.9
+      - key: APP_NAME
+        value: "Model Autopsy API"
+      - key: APP_VERSION
+        value: "0.1.0"
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: "INFO"
+      - key: DATABASE_URL
+        sync: false
+      - key: DATABASE_POOL_SIZE
+        value: "5"
+      - key: DATABASE_MAX_OVERFLOW
+        value: "10"
+      - key: DATABASE_POOL_TIMEOUT
+        value: "30"
+      - key: CORS_ORIGINS
+        value: "http://localhost:3000"
+      - key: CORS_ORIGIN_REGEX
+        value: "^https://.*\\.vercel\\.app$"
+      - key: MAX_CONCURRENT_EXPERIMENTS
+        value: "1"
+      - key: EXPERIMENT_TIMEOUT_SECONDS
+        value: "1800"
+      - key: R2_ACCOUNT_ID
+        sync: false
+      - key: R2_ACCESS_KEY_ID
+        sync: false
+      - key: R2_SECRET_ACCESS_KEY
+        sync: false
+      - key: R2_BUCKET_NAME
+        value: "model-autopsy-artifacts"
+      - key: R2_ENDPOINT_URL
+        sync: false
+

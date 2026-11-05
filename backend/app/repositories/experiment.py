@@ -18,11 +18,35 @@ class ExperimentRepository(BaseRepository[Experiment]):
         super().__init__(session, Experiment)
 
     async def get_by_experiment_id(self, experiment_id: str) -> Optional[Experiment]:
-        """Get experiment by human-readable experiment_id (e.g., EXP-0241)."""
+        """Get experiment by human-readable experiment_id (e.g., EXP-0241) with relationships."""
         result = await self.session.execute(
-            select(Experiment).where(Experiment.experiment_id == experiment_id)
+            select(Experiment)
+            .options(
+                selectinload(Experiment.runs),
+                selectinload(Experiment.result),
+                selectinload(Experiment.failed_samples),
+                selectinload(Experiment.artifacts),
+            )
+            .where(Experiment.experiment_id == experiment_id)
         )
         return result.scalar_one_or_none()
+
+    async def get_all(
+        self, skip: int = 0, limit: int = 100, order_by: str = "created_at"
+    ) -> List[Experiment]:
+        """Get all experiments with result and runs loaded."""
+        order_column = getattr(Experiment, order_by, Experiment.created_at)
+        result = await self.session.execute(
+            select(Experiment)
+            .options(
+                selectinload(Experiment.runs),
+                selectinload(Experiment.result),
+            )
+            .order_by(order_column.desc())
+            .offset(skip)
+            .limit(limit)
+        )
+        return list(result.scalars().all())
 
     async def get_with_details(self, id_: UUID) -> Optional[Experiment]:
         """Get experiment with all relationships loaded."""
@@ -41,9 +65,13 @@ class ExperimentRepository(BaseRepository[Experiment]):
     async def get_by_status(
         self, status: ExperimentStatus, skip: int = 0, limit: int = 100
     ) -> List[Experiment]:
-        """Get experiments by status."""
+        """Get experiments by status with result and runs loaded."""
         result = await self.session.execute(
             select(Experiment)
+            .options(
+                selectinload(Experiment.runs),
+                selectinload(Experiment.result),
+            )
             .where(Experiment.status == status)
             .order_by(Experiment.created_at.desc())
             .offset(skip)

@@ -25,6 +25,8 @@ class Settings(BaseSettings):
     DEBUG: bool = False
     LOG_LEVEL: str = "INFO"
 
+    PORT: int = Field(default=8000, description="Server listen port (Render environment)")
+
     # Database
     DATABASE_URL: str = Field(
         default="postgresql+asyncpg://postgres:postgres@localhost:5432/model_autopsy",
@@ -39,6 +41,17 @@ class Settings(BaseSettings):
         default=["http://localhost:3000"],
         description="Allowed CORS origins",
     )
+    CORS_ORIGIN_REGEX: Optional[str] = Field(
+        default=r"^https://.*\.vercel\.app$",
+        description="Regex pattern for allowed dynamic origins (e.g. Vercel deployments)",
+    )
+
+    # Cloudflare R2 Object Storage (S3-compatible)
+    R2_ACCOUNT_ID: Optional[str] = Field(default=None, description="Cloudflare Account ID")
+    R2_ACCESS_KEY_ID: Optional[str] = Field(default=None, description="R2 Access Key ID")
+    R2_SECRET_ACCESS_KEY: Optional[str] = Field(default=None, description="R2 Secret Access Key")
+    R2_BUCKET_NAME: str = Field(default="model-autopsy-artifacts", description="R2 Bucket Name")
+    R2_ENDPOINT_URL: Optional[str] = Field(default=None, description="R2 S3 Endpoint URL override")
 
     # ML Engine paths
     ML_ENGINE_PATH: Path = Field(
@@ -82,9 +95,16 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors_origins(cls, v: str | List[str]) -> List[str]:
-        """Parse CORS origins from string or list."""
+        """Parse CORS origins from string or list, supporting JSON or comma-separated."""
         if isinstance(v, str):
-            return [origin.strip() for origin in v.split(",")]
+            v_str = v.strip()
+            if v_str.startswith("[") and v_str.endswith("]"):
+                import json
+                try:
+                    return json.loads(v_str)
+                except Exception:
+                    pass
+            return [origin.strip().strip("'").strip('"') for origin in v_str.split(",")]
         return v
 
     @field_validator("ML_ENGINE_PATH", "ARTIFACTS_BASE_DIR", "CONFIGS_BASE_DIR", "SCRIPTS_BASE_DIR", mode="before")

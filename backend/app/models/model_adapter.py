@@ -1,30 +1,25 @@
-"""Model adapter SQLAlchemy models."""
+"""Model Adapter database model."""
 
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import (
-    DateTime,
-    ForeignKey,
-    Float,
-    Index,
-    Integer,
-    JSON,
-    String,
-    Text,
-)
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
-from app.core.database import Base
+try:
+    from app.core.database import Base
+except ImportError:
+    from backend.app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.dataset import Dataset
+    from app.models.experiment import Experiment
 
 
 class ModelAdapter(Base):
-    """Model adapter catalog model - pre-configured model configurations."""
+    """Model adapter configuration registered in the system."""
 
     __tablename__ = "model_adapters"
 
@@ -56,6 +51,11 @@ class ModelAdapter(Base):
 
     # Relationships
     dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="model_adapters")
+    experiments: Mapped[list["Experiment"]] = relationship(
+        "Experiment",
+        back_populates="model_adapter",
+        primaryjoin="ModelAdapter.model_id == foreign(Experiment.model_name)",
+    )
 
     __table_args__ = (
         Index("ix_model_adapters_dataset_active", "dataset_id", "is_active"),

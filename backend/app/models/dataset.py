@@ -1,23 +1,17 @@
-"""Dataset SQLAlchemy models."""
+"""Dataset database model."""
 
 import uuid
 from datetime import datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import (
-    DateTime,
-    ForeignKey,
-    Index,
-    Integer,
-    JSON,
-    String,
-    Text,
-    UniqueConstraint,
-)
-from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy import Boolean, DateTime, Index, Integer, String, Text
+from sqlalchemy.dialects.postgresql import JSON, UUID
+from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
-from app.core.database import Base
+try:
+    from app.core.database import Base
+except ImportError:
+    from backend.app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.experiment import Experiment
@@ -25,7 +19,7 @@ if TYPE_CHECKING:
 
 
 class Dataset(Base):
-    """Dataset catalog model - available benchmark datasets."""
+    """Benchmark dataset registered in the system."""
 
     __tablename__ = "datasets"
 
@@ -55,7 +49,11 @@ class Dataset(Base):
     )
 
     # Relationships
-    experiments: Mapped[list["Experiment"]] = relationship("Experiment", back_populates="dataset")
+    experiments: Mapped[list["Experiment"]] = relationship(
+        "Experiment",
+        back_populates="dataset",
+        primaryjoin="Dataset.dataset_id == foreign(Experiment.dataset_id)",
+    )
     model_adapters: Mapped[list["ModelAdapter"]] = relationship(
         "ModelAdapter", back_populates="dataset"
     )
@@ -63,7 +61,3 @@ class Dataset(Base):
     __table_args__ = (
         Index("ix_datasets_task_active", "task_type", "is_active"),
     )
-
-
-# Note: We don't define Experiment relationship here to avoid circular import
-# It's defined in experiment.py with back_populates="dataset"

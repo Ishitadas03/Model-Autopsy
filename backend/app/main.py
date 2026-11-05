@@ -75,6 +75,7 @@ def create_app() -> FastAPI:
     app.add_middleware(
         CORSMiddleware,
         allow_origins=settings.CORS_ORIGINS,
+        allow_origin_regex=settings.CORS_ORIGIN_REGEX,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -97,6 +98,16 @@ def create_app() -> FastAPI:
 
     # Include API router
     app.include_router(api_router, prefix="/api")
+    app.include_router(api_router, prefix="/api/v1")
+
+    # Direct health check for Render and external monitors
+    @app.get("/health", tags=["Health"])
+    async def direct_health():
+        return {
+            "status": "healthy",
+            "version": settings.APP_VERSION,
+            "app": settings.APP_NAME,
+        }
 
     # Root endpoint
     @app.get("/", tags=["Root"])

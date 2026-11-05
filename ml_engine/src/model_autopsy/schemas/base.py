@@ -10,5 +10,5 @@ class SchemaBase(BaseModel):
         from_attributes=True,
         populate_by_name=True,
         validate_assignment=True,
-        extra="forbid",
+        extra="ignore",
     )

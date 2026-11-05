@@ -74,6 +74,7 @@ async def get_experiment(
 
 
 @router.post("", response_model=ExperimentDetailSchema, status_code=status.HTTP_201_CREATED)
+@router.post("/run", response_model=ExperimentDetailSchema, status_code=status.HTTP_201_CREATED)
 async def create_experiment(
     request: ExperimentRunRequest,
     session: AsyncSession = Depends(get_session),
@@ -114,8 +115,13 @@ async def cancel_experiment(
         )
 
     try:
-        await service.cancel_experiment(experiment.id)
-        return ExperimentCancelResponse(success=True)
+        cancel_data = await service.cancel_experiment(experiment.id)
+        return ExperimentCancelResponse(
+            success=True,
+            experiment_id=experiment.experiment_id,
+            status="cancelled",
+            message=f"Experiment {experiment.experiment_id} terminated successfully.",
+        )
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -160,7 +166,7 @@ async def get_experiment_progress(
 
 def _experiment_to_summary(experiment) -> ExperimentSummarySchema:
     """Convert Experiment model to ExperimentSummarySchema."""
-    result = experiment.result
+    result = experiment.__dict__.get("result")
     task_type_val = experiment.task_type.value if hasattr(experiment.task_type, "value") else str(experiment.task_type)
     pert_val = experiment.perturbation_family.value if hasattr(experiment.perturbation_family, "value") else str(experiment.perturbation_family)
     status_val = experiment.status.value if hasattr(experiment.status, "value") else str(experiment.status)
@@ -190,8 +196,9 @@ def _experiment_to_detail(experiment) -> ExperimentDetailSchema:
     """Convert Experiment model to ExperimentDetailSchema."""
     summary = _experiment_to_summary(experiment)
     runs_data = []
-    if hasattr(experiment, "runs") and experiment.runs:
-        for run in experiment.runs:
+    runs = experiment.__dict__.get("runs")
+    if runs:
+        for run in runs:
             run_status = run.status.value if hasattr(run.status, "value") else str(run.status)
             runs_data.append({
                 "seed": run.seed,

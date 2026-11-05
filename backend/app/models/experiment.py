@@ -17,19 +17,23 @@ from sqlalchemy import (
     UniqueConstraint,
 )
 from sqlalchemy.dialects.postgresql import UUID
-from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.orm import Mapped, mapped_column, relationship, foreign
 
-from app.core.database import Base
+try:
+    from app.core.database import Base
+except ImportError:
+    from backend.app.core.database import Base
 
 if TYPE_CHECKING:
     from app.models.dataset import Dataset
+    from app.models.model_adapter import ModelAdapter
     from app.models.failure_sample import FailedSample
     from app.models.artifact import ArtifactManifest, ArtifactReference
 
 
 class ExperimentStatus(str, enum.Enum):
-    """Experiment status enumeration."""
-
+    """Experiment lifecycle execution status."""
+    DRAFT = "draft"
     QUEUED = "queued"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -37,30 +41,31 @@ class ExperimentStatus(str, enum.Enum):
     CANCELLED = "cancelled"
 
 
-class TaskType(str, enum.Enum):
-    """Task type enumeration."""
+class StressType(str, enum.Enum):
+    """Supported perturbation families."""
+    GAUSSIAN_NOISE = "gaussian_noise"
+    MISSINGNESS = "missingness"
+    OUTLIERS = "outliers"
+    POISONING = "poisoning"
+    ADVERSARIAL = "adversarial"
+    COVARIATE_SHIFT = "covariate_shift"
 
+
+class StressMode(str, enum.Enum):
+    """Execution mode for stress testing."""
+    INCREMENTAL = "incremental"
+    RANDOM = "random"
+    ADAPTIVE = "adaptive"
+
+
+class TaskType(str, enum.Enum):
+    """Machine learning task type."""
     CLASSIFICATION = "classification"
     REGRESSION = "regression"
 
 
-class StressType(str, enum.Enum):
-    """Stress/corruption type enumeration."""
-
-    GAUSSIAN_NOISE = "gaussian_noise"
-    MCAR_MISSINGNESS = "mcar_missingness"
-    OUTLIER_CONTAMINATION = "outlier_contamination"
-
-
-class StressMode(str, enum.Enum):
-    """Stress application mode enumeration."""
-
-    INCREMENTAL = "incremental"
-    INDEPENDENT = "independent"
-
-
 class Experiment(Base):
-    """Experiment model - represents a stress testing experiment configuration."""
+    """Primary experiment record tracking configuration and lifecycle state."""
 
     __tablename__ = "experiments"
 
@@ -102,7 +107,16 @@ class Experiment(Base):
     completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationships
-    dataset: Mapped["Dataset"] = relationship("Dataset", back_populates="experiments")
+    dataset: Mapped[Optional["Dataset"]] = relationship(
+        "Dataset",
+        back_populates="experiments",
+        primaryjoin="Dataset.dataset_id == foreign(Experiment.dataset_id)",
+    )
+    model_adapter: Mapped[Optional["ModelAdapter"]] = relationship(
+        "ModelAdapter",
+        back_populates="experiments",
+        primaryjoin="ModelAdapter.model_id == foreign(Experiment.model_name)",
+    )
     runs: Mapped[list["ExperimentRun"]] = relationship(
         "ExperimentRun", back_populates="experiment", cascade="all, delete-orphan"
     )

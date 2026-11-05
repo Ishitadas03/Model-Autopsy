@@ -23,7 +23,9 @@ class Base(DeclarativeBase):
 # Create async engine
 connect_args = {}
 if "postgresql" in settings.DATABASE_URL:
-    connect_args = {"timeout": 2.0, "command_timeout": 5.0}
+    connect_args = {"timeout": 10.0, "command_timeout": 15.0}
+    if any(k in settings.DATABASE_URL for k in ["supabase", "pooler", "sslmode=require", "render.com"]):
+        connect_args["ssl"] = "require"
 
 engine: AsyncEngine = create_async_engine(
     settings.DATABASE_URL,

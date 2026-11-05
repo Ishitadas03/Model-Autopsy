@@ -56,6 +56,8 @@ class MLEngineBridge:
             "e002": "run_e002.py",
             "e003": "run_e003.py",
             "e004": "run_e004.py",
+            "e005": "run_e005.py",
+            "e006": "run_e006.py",
         }
         script_name = script_map.get(experiment_type.lower())
         if not script_name:

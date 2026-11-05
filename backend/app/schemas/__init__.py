@@ -18,6 +18,12 @@ from model_autopsy.schemas import (
     DatasetFeatureSchema,
     EnvironmentMetadataSchema,
     EvaluationMetricsSchema,
+    ExperimentCancelResponse,
+    ExperimentDetailSchema,
+    ExperimentProgressSchema,
+    ExperimentResultsSchema,
+    ExperimentRunRequest,
+    ExperimentSummarySchema,
     FailureBoundarySchema,
     MetricStatisticsSchema,
     MetricType,
@@ -144,100 +150,6 @@ class ExperimentResultsResponse(BaseModel):
     statistical_validation: Optional[Dict[str, Any]] = Field(default=None, alias="statisticalValidation")
     most_vulnerable_feature: Optional[Dict[str, Any]] = Field(default=None, alias="mostVulnerableFeature")
 
-
-class ExperimentSummarySchema(BaseModel):
-    """Summary representation for experiment listing."""
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
-
-    id: str
-    title: Optional[str] = None
-    model_name: str = Field(alias="modelName")
-    model_id: Optional[str] = Field(default=None, alias="modelId")
-    dataset_name: str = Field(alias="datasetName")
-    dataset_id: str = Field(alias="datasetId")
-    task_type: str = Field(alias="taskType")
-    perturbation_family: Optional[str] = Field(default=None, alias="perturbationFamily")
-    noise_type: Optional[str] = Field(default=None, alias="noiseType")
-    evaluation_metric: Optional[str] = Field(default=None, alias="evaluationMetric")
-    metric: Optional[str] = None
-    failure_threshold: float = Field(alias="failureThreshold")
-    seed: int = 42
-    status: str = "queued"
-    progress_percent: float = Field(default=0.0, alias="progressPercent")
-    created_at: str = Field(alias="createdAt")
-    completed_at: Optional[str] = Field(default=None, alias="completedAt")
-    observed_boundary: Optional[float] = Field(default=None, alias="observedBoundary")
-    error_message: Optional[str] = Field(default=None, alias="errorMessage")
-    results: Optional[ExperimentResultsResponse] = None
-
-
-class ExperimentDetailSchema(ExperimentSummarySchema):
-    """Detailed experiment representation."""
-    runs: List[Dict[str, Any]] = Field(default_factory=list)
-    config_yaml: Optional[str] = Field(default=None, alias="configYaml")
-    severity_levels: List[float] = Field(default_factory=list, alias="severityLevels")
-    seeds: List[int] = Field(default_factory=list)
-    stress_mode: Optional[str] = Field(default=None, alias="stressMode")
-    stress_config: Optional[Dict[str, Any]] = Field(default=None, alias="stressConfig")
-    test_size: Optional[float] = Field(default=0.20, alias="testSize")
-    progress: Optional[Dict[str, Any]] = None
-    artifacts: Union[Dict[str, str], List[Dict[str, Any]]] = Field(default_factory=dict)
-
-
-class ExperimentRunRequest(BaseModel):
-    """Request payload to create a new experiment."""
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
-
-    model_name: Optional[str] = Field(default=None, alias="modelName")
-    model_id: Optional[str] = Field(default=None, alias="modelId")
-    dataset_name: Optional[str] = Field(default=None, alias="datasetName")
-    dataset_id: str = Field(alias="datasetId")
-    task_type: Optional[str] = Field(default="classification", alias="taskType")
-    perturbation_family: Optional[str] = Field(default="gaussian_noise", alias="perturbationFamily")
-    noise_type: Optional[str] = Field(default="Gaussian Noise", alias="noiseType")
-    evaluation_metric: Optional[str] = Field(default="f1", alias="evaluationMetric")
-    metric: Optional[str] = None
-    failure_threshold: float = Field(default=0.80, alias="failureThreshold")
-    seed: int = 42
-    seeds: Optional[List[int]] = None
-    stress_mode: Optional[str] = Field(default="incremental", alias="stressMode")
-    stress_config: Optional[Any] = Field(default=None, alias="stressConfig")
-    test_size: Optional[float] = Field(default=0.20, alias="testSize")
-    title: Optional[str] = None
-
-
-class ExperimentCancelResponse(BaseModel):
-    """Response payload when cancelling an experiment."""
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
-
-    success: bool = True
-    experiment_id: Optional[str] = Field(default=None, alias="experimentId")
-    status: Optional[str] = "cancelled"
-    message: Optional[str] = "Experiment cancelled successfully"
-
-
-class ExperimentProgressSchema(BaseModel):
-    """Progress tracking payload."""
-    model_config = ConfigDict(populate_by_name=True, extra="ignore")
-
-    experiment_id: Optional[str] = Field(default=None, alias="experimentId")
-    status: str = "queued"
-    progress_percent: float = Field(default=0.0, alias="progressPercent")
-    completed_cells: int = Field(default=0, alias="completedCells")
-    total_cells: int = Field(default=1, alias="totalCells")
-    current_seed_index: int = Field(default=0, alias="currentSeedIndex")
-    current_severity_index: int = Field(default=0, alias="currentSeverityIndex")
-    current_seed: Optional[int] = Field(default=None, alias="currentSeed")
-    current_severity: Optional[float] = Field(default=None, alias="currentSeverity")
-    current_model: Optional[str] = Field(default=None, alias="currentModel")
-    current_corruption: Optional[str] = Field(default=None, alias="currentCorruption")
-    total_seeds: int = Field(default=1, alias="totalSeeds")
-    total_severities: int = Field(default=1, alias="totalSeverities")
-    error_message: Optional[str] = Field(default=None, alias="errorMessage")
-
-
-# Set backward-compatible alias
-ExperimentResultsSchema = ExperimentResultsResponse
 
 __all__ = [
     # Base

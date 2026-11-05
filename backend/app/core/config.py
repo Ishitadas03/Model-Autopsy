@@ -110,8 +110,19 @@ class Settings(BaseSettings):
     @field_validator("ML_ENGINE_PATH", "ARTIFACTS_BASE_DIR", "CONFIGS_BASE_DIR", "SCRIPTS_BASE_DIR", mode="before")
     @classmethod
     def resolve_path(cls, v: str | Path) -> Path:
-        """Resolve path to absolute."""
-        return Path(v).resolve()
+        """Resolve path to absolute relative to project root or backend dir."""
+        p = Path(v)
+        if p.is_absolute():
+            return p.resolve()
+        backend_dir = Path(__file__).resolve().parents[2]
+        project_root = Path(__file__).resolve().parents[3]
+        candidate_from_backend = (backend_dir / p).resolve()
+        if candidate_from_backend.exists():
+            return candidate_from_backend
+        candidate_from_root = (project_root / p).resolve()
+        if candidate_from_root.exists():
+            return candidate_from_root
+        return candidate_from_backend
 
     @field_validator("DEFAULT_SEEDS", mode="before")
     @classmethod

@@ -12,6 +12,10 @@ from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import sessionmaker
 
+# Set test database before settings or database modules load
+TEST_DATABASE_URL = "sqlite+aiosqlite:///./test.db"
+os.environ["DATABASE_URL"] = TEST_DATABASE_URL
+
 # Add project root and backend to path
 backend_dir = Path(__file__).parent.parent
 project_root = backend_dir.parent
@@ -44,6 +48,11 @@ async def test_engine():
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
     yield engine
+    try:
+        async with engine.begin() as conn:
+            await conn.run_sync(Base.metadata.drop_all)
+    except Exception:
+        pass
     await engine.dispose()
     test_db = Path("./test.db")
     if test_db.exists():

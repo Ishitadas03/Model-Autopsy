@@ -22,19 +22,25 @@ class Base(DeclarativeBase):
 
 # Create async engine
 connect_args = {}
+engine_kwargs = {
+    "echo": settings.DEBUG,
+}
+
 if "postgresql" in settings.DATABASE_URL:
     connect_args = {"timeout": 10.0, "command_timeout": 15.0}
     if any(k in settings.DATABASE_URL for k in ["supabase", "pooler", "sslmode=require", "render.com"]):
         connect_args["ssl"] = "require"
+    engine_kwargs.update({
+        "pool_size": settings.DATABASE_POOL_SIZE,
+        "max_overflow": settings.DATABASE_MAX_OVERFLOW,
+        "pool_timeout": settings.DATABASE_POOL_TIMEOUT,
+        "pool_pre_ping": True,
+        "connect_args": connect_args,
+    })
 
 engine: AsyncEngine = create_async_engine(
     settings.DATABASE_URL,
-    pool_size=settings.DATABASE_POOL_SIZE,
-    max_overflow=settings.DATABASE_MAX_OVERFLOW,
-    pool_timeout=settings.DATABASE_POOL_TIMEOUT,
-    pool_pre_ping=True,
-    echo=settings.DEBUG,
-    connect_args=connect_args,
+    **engine_kwargs,
 )
 
 # Session factory

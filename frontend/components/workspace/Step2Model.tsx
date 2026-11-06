@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Check, Cpu, ShieldCheck, AlertCircle, Info, Sliders } from 'lucide-react';
 import { ModelAdapter, TaskType } from '@/lib/schemas';
 import { api } from '@/lib/api';
@@ -23,28 +23,76 @@ export function Step2Model({
   onSelectModel,
   onUpdateParams,
 }: Step2ModelProps) {
-  const [models, setModels] = React.useState<ModelAdapter[]>(MOCK_MODELS);
+  const [models, setModels] = useState<ModelAdapter[]>(MOCK_MODELS);
 
-  React.useEffect(() => {
+  useEffect(() => {
     let mounted = true;
     api.getModels()
       .then((data) => {
-        if (mounted && Array.isArray(data) && data.length > 0) {
-          setModels(data);
+        if (!mounted || !Array.isArray(data) || data.length === 0) return;
+
+        // Normalize backend models to conform to ModelAdapter schema
+        const normalizedBackendModels: ModelAdapter[] = data.map((m: any) => {
+          const rawTypes = Array.isArray(m.taskTypes)
+            ? m.taskTypes
+            : Array.isArray(m.task_types)
+            ? m.task_types
+            : [m.taskType || m.task_type || 'classification'];
+
+          return {
+            id: m.id || m.model_id,
+            name: m.name || m.model_name || 'Model Adapter',
+            framework: 'scikit-learn',
+            taskTypes: rawTypes.map((t: string) => String(t).toLowerCase() as TaskType),
+            predictProba: m.predictProba ?? m.predict_proba ?? true,
+            description: m.description || 'Pre-configured scikit-learn model adapter.',
+            parameters: m.parameters || m.hyperparameters || {
+              n_estimators: 100,
+              max_depth: 10,
+              min_samples_split: 2,
+            },
+          };
+        });
+
+        // Always keep the general workspace models available alongside backend models
+        const combined = [...MOCK_MODELS];
+        for (const bm of normalizedBackendModels) {
+          if (!combined.some((cm) => cm.id === bm.id)) {
+            combined.push(bm);
+          }
         }
+        setModels(combined);
       })
-      .catch(() => {});
+      .catch(() => {
+        // Retain MOCK_MODELS on any fetch issue
+      });
+
     return () => {
       mounted = false;
     };
   }, []);
 
-  // Filter models compatible with current dataset task type
-  const compatibleModels = models.filter((m) =>
-    m.taskTypes.includes(taskType)
-  );
+  // Filter models compatible with current dataset task type (case-insensitive)
+  const normalizedTask = (taskType || 'classification').toLowerCase();
+  const compatibleModels = models.filter((m) => {
+    if (!m || !m.taskTypes) return true;
+    return m.taskTypes.some((t) => String(t).toLowerCase() === normalizedTask);
+  });
 
-  const selectedModel = models.find((m) => m.id === selectedModelId);
+  const displayModels = compatibleModels.length > 0 ? compatibleModels : models;
+
+  // Active selected model with safe fallback
+  const selectedModel =
+    displayModels.find((m) => m.id === selectedModelId) ||
+    displayModels[0] ||
+    MOCK_MODELS[0];
+
+  // Auto-select first compatible model if current selected model is invalid or incompatible
+  useEffect(() => {
+    if (selectedModel && (!selectedModelId || !displayModels.some((m) => m.id === selectedModelId))) {
+      onSelectModel(selectedModel);
+    }
+  }, [selectedModel, selectedModelId, displayModels, onSelectModel]);
 
   const handleParamChange = (paramKey: string, val: any) => {
     onUpdateParams({
@@ -52,6 +100,10 @@ export function Step2Model({
       [paramKey]: val,
     });
   };
+
+  const paramEntries = selectedModel?.parameters
+    ? Object.entries(selectedModel.parameters)
+    : [];
 
   return (
     <div className="space-y-6">
@@ -62,8 +114,8 @@ export function Step2Model({
       </Callout>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {compatibleModels.map((model) => {
-          const isSelected = selectedModelId === model.id;
+        {displayModels.map((model) => {
+          const isSelected = selectedModel?.id === model.id;
 
           return (
             <div
@@ -132,7 +184,7 @@ export function Step2Model({
       </div>
 
       {/* SVM uncalibrated probability caveat */}
-      {selectedModelId === 'svm-classifier' && (
+      {selectedModel?.id === 'svm-classifier' && (
         <div className="p-3.5 rounded-lg bg-warning/10 border border-warning/20 text-xs text-warning flex items-start gap-2">
           <Info className="w-4 h-4 flex-shrink-0 mt-0.5" />
           <span>
@@ -142,7 +194,7 @@ export function Step2Model({
       )}
 
       {/* Hyperparameter Configuration Panel */}
-      {selectedModel && (
+      {selectedModel && paramEntries.length > 0 && (
         <div className="p-5 rounded-xl bg-surface border border-border space-y-4">
           <div className="flex items-center gap-2 pb-2 border-b border-white/5">
             <Sliders className="w-4 h-4 text-text-subtle" />
@@ -152,7 +204,7 @@ export function Step2Model({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-            {Object.entries(selectedModel.parameters).map(([key, defaultVal]) => {
+            {paramEntries.map(([key, defaultVal]) => {
               const currentVal =
                 selectedModelParams[key] !== undefined
                   ? selectedModelParams[key]

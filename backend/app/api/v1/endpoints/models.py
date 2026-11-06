@@ -57,7 +57,11 @@ def _model_to_schema(model) -> ModelAdapterSchema:
         name=model.name,
         description=model.description,
         taskType=model.task_type,
+        taskTypes=[model.task_type] if model.task_type else ["classification"],
         supportedDatasets=[model.dataset_id],
         framework=model.framework,
         baselineF1=model.baseline_f1,
+        baselineAccuracy=model.baseline_accuracy,
+        predictProba=True,
+        parameters=model.hyperparameters or {},
     )

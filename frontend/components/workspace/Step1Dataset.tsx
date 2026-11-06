@@ -108,17 +108,27 @@ export function Step1Dataset({
       });
 
       setIsUploading(false);
+      const cleanTaskType: 'classification' | 'regression' =
+        String(uploadedDs.taskType || 'classification').toLowerCase() === 'regression'
+          ? 'regression'
+          : 'classification';
+
+      const cleanDs: Dataset = {
+        ...uploadedDs,
+        taskType: cleanTaskType,
+      };
+
       setUploadedSchema({
-        name: uploadedDs.name,
-        sampleCount: uploadedDs.sampleCount,
-        featureCount: uploadedDs.featureCount,
-        features: (uploadedDs.features as any) || [],
+        name: cleanDs.name,
+        sampleCount: cleanDs.sampleCount,
+        featureCount: cleanDs.featureCount,
+        features: (cleanDs.features as any) || [],
         targetColumn: 'target',
-        taskType: (uploadedDs.taskType as any) || 'classification',
+        taskType: cleanTaskType,
       });
 
-      setDatasets((prev) => [uploadedDs, ...prev.filter((d) => d.id !== uploadedDs.id)]);
-      onSelectDataset(uploadedDs);
+      setDatasets((prev) => [cleanDs, ...prev.filter((d) => d.id !== cleanDs.id)]);
+      onSelectDataset(cleanDs);
     } catch (err: any) {
       setIsUploading(false);
       setUploadError(err?.message || 'Failed to upload dataset to storage.');

@@ -195,3 +195,4 @@ flowchart TD
 - **Path Traversal Prevention:** Dataset keys are validated using alphanumeric sanitization (`re.sub(r'[^a-zA-Z0-9_\-\.]', '_', filename)`); directory traversal (`../`) is rejected.
 - **Resource Limits:** Uploaded CSV size is capped at 25 MB on both client and FastAPI `UploadFile` stream. Concurrency is limited to 2 simultaneous background ML executions to avoid Render memory limits.
 - **Data Preservation:** Zero destructive database operations; zero table drops; existing E001–E006 benchmarks and live experiment records in Supabase remain untouched.
+

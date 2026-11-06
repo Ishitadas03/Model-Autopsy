@@ -1,16 +1,14 @@
 {
-  "name": "Model-Autopsy-1",
-  "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "name": "model-autopsy",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Model Autopsy — ML Model Robustness Testing & Failure Boundary Detection",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "@supabase/ssr": "^0.12.7",
-    "@supabase/supabase-js": "^2.119.0"
+    "dev": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix frontend run start",
+    "lint": "npm --prefix frontend run lint",
+    "test": "npm --prefix frontend run test",
+    "typecheck": "npm --prefix frontend run typecheck"
   }
 }

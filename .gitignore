@@ -45,6 +45,7 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 pnpm-debug.log*
+*.tsbuildinfo
 
 # Environment
 .env
@@ -59,6 +60,10 @@ pnpm-debug.log*
 artifacts/*
 !artifacts/**/
 !artifacts/**/.gitkeep
+artifacts/experiments/EXP-*/
+artifacts/experiments/test_*/
+artifacts/experiments/experiments/
+data/
 
 # IDE & Editors
 .vscode/
@@ -89,4 +94,7 @@ temp/
 *.db-shm
 *.db-wal
 
-artifacts/experiments/EXP-*/
+# Prevent loose media in repository root (frontend assets live in frontend/public/)
+/*.mp4
+/*.mov
+/*.avi

@@ -37,7 +37,7 @@ from app.repositories.experiment import (
     ExperimentResultRepository,
 )
 from app.repositories.failure_sample import FailureSampleRepository
-from app.repositories.artifact import ArtifactRepository
+from app.repositories.artifact import ArtifactRepository, ArtifactReferenceRepository
 from app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
 from app.schemas import ExperimentRunRequest
 
@@ -447,14 +447,30 @@ class ExperimentService:
                 mime_type=mime_type,
             )
 
-            # Replicate artifact to Cloudflare R2 object storage if configured
+            # Store artifact using unified storage_service (R2 with local fallback)
             try:
-                from backend.app.services.storage_service import storage_service
-                if storage_service.is_configured() and file_path_obj.exists():
+                try:
+                    from app.services.storage_service import storage_service
+                except ImportError:
+                    from backend.app.services.storage_service import storage_service
+
+                if file_path_obj.exists():
                     r2_key = f"experiments/{experiment.experiment_id}/{art['file_name']}"
-                    storage_service.upload_file(file_path_obj, r2_key, mime_type)
+                    upload_res = storage_service.store_file(file_path_obj, r2_key, mime_type)
+                    ref_repo = ArtifactReferenceRepository(session)
+                    await ref_repo.create(
+                        manifest_id=manifest.id,
+                        reference_type=upload_res.provider,
+                        reference_url=upload_res.key,
+                        metadata_={
+                            "sha256": upload_res.sha256_hash,
+                            "size_bytes": upload_res.size_bytes,
+                            "etag": upload_res.etag,
+                            "url": upload_res.url,
+                        },
+                    )
             except Exception as e:
-                logger.warning(f"R2 storage upload skipped or failed for {art.get('file_name')}: {e}")
+                logger.warning(f"Storage replication error for {art.get('file_name')}: {e}")
 
         # Store failed samples
         for s in failed_samples:

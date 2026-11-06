@@ -65,6 +65,28 @@ class ArtifactService:
         file_path = settings.ARTIFACTS_BASE_DIR / manifest.file_path
 
         if not file_path.exists():
+            # If local file is missing, attempt to retrieve from storage service / Cloudflare R2
+            try:
+                try:
+                    from app.services.storage_service import storage_service
+                except ImportError:
+                    from backend.app.services.storage_service import storage_service
+
+                retrieved = False
+                manifest_with_refs = await self.artifact_repo.get_with_references(manifest.id)
+                if manifest_with_refs and manifest_with_refs.references:
+                    for ref in manifest_with_refs.references:
+                        if ref.reference_url and storage_service.retrieve_file(ref.reference_url, file_path):
+                            retrieved = True
+                            break
+                if not retrieved:
+                    # Try default key structure
+                    default_key = f"experiments/{manifest.file_path}"
+                    storage_service.retrieve_file(default_key, file_path)
+            except Exception as e:
+                logger.warning(f"Failed to fetch missing artifact from storage: {e}")
+
+        if not file_path.exists():
             raise ArtifactNotFoundError(f"Artifact file not found: {file_path}")
 
         format_str = str(format).lower()

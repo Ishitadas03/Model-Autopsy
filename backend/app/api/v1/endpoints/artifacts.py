@@ -129,12 +129,22 @@ async def get_experiment_artifact(
         except ImportError:
             from backend.app.services.storage_service import storage_service
         if storage_service.is_configured():
-            r2_key = f"experiments/{experiment_id}/{artifact_type}"
-            if storage_service.object_exists(r2_key):
-                presigned = storage_service.generate_presigned_url(r2_key)
-                if presigned:
-                    from fastapi.responses import RedirectResponse
-                    return RedirectResponse(url=presigned, status_code=307)
+            candidates = [artifact_type] + aliases.get(artifact_type.lower(), [])
+            for cand in candidates:
+                r2_key = f"experiments/{experiment_id}/{cand}"
+                if storage_service.object_exists_in_r2(r2_key):
+                    presigned = storage_service.generate_presigned_url(r2_key)
+                    if presigned:
+                        from fastapi.responses import RedirectResponse
+                        return RedirectResponse(url=presigned, status_code=307)
+                    content = storage_service.get_object_bytes_from_r2(r2_key)
+                    if content is not None:
+                        suffix = Path(cand).suffix.lower()
+                        return Response(
+                            content=content,
+                            media_type=MIME_MAP.get(suffix, "application/octet-stream"),
+                            headers={"Content-Disposition": f'attachment; filename="{cand}"'},
+                        )
     except Exception:
         pass
 

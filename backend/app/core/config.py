@@ -4,7 +4,7 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, List, Optional
 
-from pydantic import Field, field_validator
+from pydantic import AliasChoices, Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -51,12 +51,21 @@ class Settings(BaseSettings):
     R2_ACCESS_KEY_ID: Optional[str] = Field(default=None, description="R2 Access Key ID")
     R2_SECRET_ACCESS_KEY: Optional[str] = Field(default=None, description="R2 Secret Access Key")
     R2_BUCKET_NAME: str = Field(default="model-autopsy-artifacts", description="R2 Bucket Name")
-    R2_ENDPOINT_URL: Optional[str] = Field(default=None, description="R2 S3 Endpoint URL override")
+    R2_ENDPOINT_URL: Optional[str] = Field(
+        default=None,
+        validation_alias=AliasChoices("R2_ENDPOINT_URL", "R2_ENDPOINT", "r2_endpoint_url", "r2_endpoint"),
+        description="R2 S3 Endpoint URL override",
+    )
+    STORAGE_PROVIDER: str = Field(default="auto", description="Storage provider: 'auto', 'r2', or 'local'")
 
     # ML Engine paths
     ML_ENGINE_PATH: Path = Field(
         default=Path(__file__).parent.parent.parent.parent / "ml_engine",
         description="Path to ML engine root directory",
+    )
+    DATASETS_BASE_DIR: Path = Field(
+        default=Path(__file__).parent.parent.parent.parent / "data" / "datasets",
+        description="Base directory for custom uploaded datasets",
     )
     ARTIFACTS_BASE_DIR: Path = Field(
         default=Path(__file__).parent.parent.parent.parent / "artifacts" / "experiments",

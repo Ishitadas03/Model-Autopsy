@@ -26,6 +26,19 @@ import { ErrorState } from '@/components/ui/ErrorState';
 import { Dialog } from '@/components/ui/Dialog';
 import { useToast } from '@/components/ui/Toast';
 
+function formatExperimentDate(isoString?: string | null): string {
+  if (!isoString) return 'Recent';
+  try {
+    // Sanitize accidental trailing timezone artifacts such as "+00:00Z"
+    const cleaned = isoString.replace(/\+00:00Z$/, 'Z').replace(/\+00:00$/, 'Z');
+    const d = new Date(cleaned);
+    if (isNaN(d.getTime())) return isoString.split('T')[0] || 'Recent';
+    return d.toLocaleDateString();
+  } catch {
+    return 'Recent';
+  }
+}
+
 export default function ExperimentsPage() {
   const router = useRouter();
   const { toast } = useToast();
@@ -50,7 +63,12 @@ export default function ExperimentsPage() {
     setError(null);
     try {
       const data = await api.getExperiments();
-      setExperiments(data);
+      if (Array.isArray(data)) {
+        setExperiments(data);
+      } else {
+        setExperiments([]);
+        setError((data as any)?.detail || 'Unexpected experiment list response');
+      }
     } catch (err: any) {
       setError(err?.message || 'Failed to load experiments');
     } finally {
@@ -58,7 +76,8 @@ export default function ExperimentsPage() {
     }
   };
 
-  const filtered = experiments.filter((exp) => {
+  const filtered = (experiments || []).filter((exp) => {
+    if (!exp) return false;
     if (statusFilter !== 'all' && exp.status !== statusFilter) return false;
     if (datasetFilter !== 'all' && exp.datasetId !== datasetFilter) return false;
     if (search.trim()) {
@@ -73,7 +92,9 @@ export default function ExperimentsPage() {
     return true;
   });
 
-  const uniqueDatasets = Array.from(new Set(experiments.map((e) => e.datasetId)));
+  const uniqueDatasets = Array.from(
+    new Set((experiments || []).map((e) => e?.datasetId).filter(Boolean))
+  ) as string[];
 
   const handleConfirmRerun = async () => {
     if (!rerunTarget) return;
@@ -256,7 +277,7 @@ export default function ExperimentsPage() {
                       </span>
                       <span className="flex items-center gap-1 text-[11px] text-text-subtle/80">
                         <Clock className="w-3 h-3" />
-                        {new Date(exp.createdAt).toLocaleDateString()}
+                        {formatExperimentDate(exp.createdAt)}
                       </span>
                     </div>
                   </div>

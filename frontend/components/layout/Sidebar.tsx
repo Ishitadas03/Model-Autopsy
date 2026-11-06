@@ -26,7 +26,7 @@ export function Sidebar({ className = '', experimentId }: SidebarProps) {
   const pathname = usePathname();
 
   const mainItems = [
-    { label: 'Overview', href: '/experiments', icon: LayoutDashboard },
+    { label: 'Overview', href: '/', icon: LayoutDashboard },
     { label: 'Experiments', href: '/experiments', icon: FlaskConical },
     { label: 'Datasets', href: '/datasets', icon: Database },
     { label: 'Models', href: '/models', icon: Cpu },

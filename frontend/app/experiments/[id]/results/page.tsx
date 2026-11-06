@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, Suspense } from 'react';
+import React, { useState, useEffect, useCallback, Suspense } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -61,22 +61,31 @@ function ResultsDashboardContent() {
   const [isRerunModalOpen, setIsRerunModalOpen] = useState(false);
   const [isRerunning, setIsRerunning] = useState(false);
 
-  useEffect(() => {
-    const loadExperimentData = async () => {
-      setLoading(true);
-      try {
-        const data = await api.getExperiment(experimentId);
-        // Fallback to hero experiment for rich visualization demo
-        setExperiment(data?.results ? data : HERO_EXPERIMENT);
-      } catch (e) {
+  const loadExperimentData = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await api.getExperiment(experimentId);
+      if (data) {
+        setExperiment(data);
+      } else if (process.env.NEXT_PUBLIC_USE_MOCKS === 'true') {
         setExperiment(HERO_EXPERIMENT);
-      } finally {
-        setLoading(false);
+      } else {
+        setExperiment(null);
       }
-    };
-
-    loadExperimentData();
+    } catch (e) {
+      if (process.env.NEXT_PUBLIC_USE_MOCKS === 'true') {
+        setExperiment(HERO_EXPERIMENT);
+      } else {
+        setExperiment(null);
+      }
+    } finally {
+      setLoading(false);
+    }
   }, [experimentId]);
+
+  useEffect(() => {
+    loadExperimentData();
+  }, [loadExperimentData]);
 
   const handleCopyManifest = async () => {
     if (!experiment) return;
@@ -155,7 +164,41 @@ function ResultsDashboardContent() {
     );
   }
 
-  const results = experiment?.results || HERO_EXPERIMENT.results!;
+  if (!experiment) {
+    return (
+      <AppShell showSidebar={false}>
+        <div className="max-w-4xl mx-auto w-full py-16">
+          <ErrorState
+            title="Experiment Not Found"
+            message={`Could not find experiment '${experimentId}' on the backend.`}
+            onRetry={loadExperimentData}
+          />
+        </div>
+      </AppShell>
+    );
+  }
+
+  if (experiment.status === 'running' || experiment.status === 'queued') {
+    return (
+      <AppShell showSidebar={false}>
+        <div className="max-w-4xl mx-auto w-full py-16 space-y-4 text-center">
+          <div className="p-8 rounded-xl bg-surface border border-border">
+            <h2 className="font-manrope font-semibold text-xl text-white">Experiment In Progress</h2>
+            <p className="text-sm text-text-muted mt-2">
+              Experiment {experiment.id} is currently {experiment.status} ({experiment.progressPercent}%).
+            </p>
+            <div className="mt-6 flex justify-center gap-3">
+              <Link href={`/experiments/${experiment.id}`}>
+                <Button variant="primary">View Live Execution</Button>
+              </Link>
+            </div>
+          </div>
+        </div>
+      </AppShell>
+    );
+  }
+
+  const results = experiment.results || HERO_EXPERIMENT.results!;
   const curveData = results.curveData || [];
 
   const tabs = [

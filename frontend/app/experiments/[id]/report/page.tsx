@@ -46,9 +46,19 @@ export default function ResearchReportPage() {
       setLoading(true);
       try {
         const data = await api.getExperiment(experimentId);
-        setExperiment(data?.results ? data : HERO_EXPERIMENT);
+        if (data) {
+          setExperiment(data);
+        } else if (process.env.NEXT_PUBLIC_USE_MOCKS === 'true') {
+          setExperiment(HERO_EXPERIMENT);
+        } else {
+          setExperiment(null);
+        }
       } catch {
-        setExperiment(HERO_EXPERIMENT);
+        if (process.env.NEXT_PUBLIC_USE_MOCKS === 'true') {
+          setExperiment(HERO_EXPERIMENT);
+        } else {
+          setExperiment(null);
+        }
       } finally {
         setLoading(false);
       }

@@ -164,6 +164,18 @@ async def get_experiment_progress(
     )
 
 
+def _format_iso(dt) -> Optional[str]:
+    """Format datetime safely without redundant timezone tokens like +00:00Z."""
+    if not dt:
+        return None
+    iso = dt.isoformat()
+    if "+00:00" in iso:
+        iso = iso.replace("+00:00", "Z")
+    elif not iso.endswith("Z"):
+        iso = iso + "Z"
+    return iso
+
+
 def _experiment_to_summary(experiment) -> ExperimentSummarySchema:
     """Convert Experiment model to ExperimentSummarySchema."""
     result = experiment.__dict__.get("result")
@@ -192,8 +204,8 @@ def _experiment_to_summary(experiment) -> ExperimentSummarySchema:
         seed=experiment.seed,
         status=status_val,
         progressPercent=float(experiment.progress_percent or 0),
-        createdAt=experiment.created_at.isoformat() + "Z" if experiment.created_at else "",
-        completedAt=experiment.completed_at.isoformat() + "Z" if experiment.completed_at else None,
+        createdAt=_format_iso(experiment.created_at) or "",
+        completedAt=_format_iso(experiment.completed_at),
         observedBoundary=result.observed_boundary if result else None,
         errorMessage=experiment.error_message,
         results=_build_results(result, experiment.evaluation_metric or "f1") if result else None,
@@ -229,8 +241,8 @@ def _experiment_to_detail(experiment) -> ExperimentDetailSchema:
         severityLevels=experiment.severity_levels or [],
         seeds=experiment.seeds or [],
         stressMode=stress_mode_val,
-        startedAt=experiment.started_at.isoformat() + "Z" if experiment.started_at else None,
-        completedAt=experiment.completed_at.isoformat() + "Z" if experiment.completed_at else None,
+        startedAt=_format_iso(experiment.started_at),
+        completedAt=_format_iso(experiment.completed_at),
     )
 
 

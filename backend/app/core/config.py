@@ -38,7 +38,11 @@ class Settings(BaseSettings):
 
     # CORS
     CORS_ORIGINS: List[str] = Field(
-        default=["http://localhost:3000"],
+        default=[
+            "http://localhost:3000",
+            "https://model-autopsy-ai.vercel.app",
+            "https://model-autopsy.ai.vercel.app",
+        ],
         description="Allowed CORS origins",
     )
     CORS_ORIGIN_REGEX: Optional[str] = Field(

@@ -6,8 +6,8 @@ import { E003_FIXTURE_DATA } from './mocks/e003Data';
 
 const USE_MOCKS =
   typeof window !== 'undefined'
-    ? process.env.NEXT_PUBLIC_USE_MOCKS !== 'false'
-    : true;
+    ? process.env.NEXT_PUBLIC_USE_MOCKS === 'true'
+    : false;
 
 let runtimeExperiments: Experiment[] = [...MOCK_EXPERIMENTS];
 
@@ -38,7 +38,12 @@ export const api = {
       return [...runtimeExperiments];
     }
     const res = await fetch('/api/experiments');
-    return res.json();
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      throw new Error(err.detail || `Failed to fetch experiments (HTTP ${res.status})`);
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
   },
 
   async getExperiment(id: string): Promise<Experiment | null> {
@@ -134,7 +139,69 @@ export const api = {
       return [...MOCK_DATASETS];
     }
     const res = await fetch('/api/datasets');
+    if (!res.ok) {
+      return [...MOCK_DATASETS];
+    }
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0 ? data : [...MOCK_DATASETS];
+  },
+
+  async uploadDataset(
+    file: File,
+    options?: {
+      datasetId?: string;
+      name?: string;
+      description?: string;
+      taskType?: string;
+      targetName?: string;
+    }
+  ): Promise<Dataset> {
+    if (USE_MOCKS) {
+      await new Promise((r) => setTimeout(r, 400));
+      const mockId = options?.datasetId || `custom-${Date.now()}`;
+      return {
+        id: mockId,
+        name: options?.name || file.name.replace(/\.csv$/i, ''),
+        description: options?.description || 'User-uploaded CSV dataset',
+        taskType: (options?.taskType as any) || 'classification',
+        sampleCount: 150,
+        featureCount: 4,
+        classCount: 2,
+        isCustom: true,
+        features: [
+          { name: 'feature_1', type: 'numeric', missingCount: 0 },
+          { name: 'feature_2', type: 'numeric', missingCount: 0 },
+        ],
+      };
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+    if (options?.datasetId) formData.append('dataset_id', options.datasetId);
+    if (options?.name) formData.append('name', options.name);
+    if (options?.description) formData.append('description', options.description);
+    if (options?.taskType) formData.append('task_type', options.taskType);
+    if (options?.targetName) formData.append('target_name', options.targetName);
+
+    const res = await fetch('/api/datasets/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!res.ok) {
+      const errJson = await res.json().catch(() => ({}));
+      throw new Error(errJson.detail || `Dataset upload failed (HTTP ${res.status})`);
+    }
+
     return res.json();
+  },
+
+  getDatasetDownloadUrl(datasetId: string): string {
+    return `/api/datasets/${datasetId}/download`;
+  },
+
+  getArtifactDownloadUrl(experimentId: string, artifactType: string): string {
+    return `/api/experiments/${experimentId}/artifacts/${artifactType}`;
   },
 
   async getModels(): Promise<ModelAdapter[]> {
@@ -142,7 +209,11 @@ export const api = {
       return [...MOCK_MODELS];
     }
     const res = await fetch('/api/models');
-    return res.json();
+    if (!res.ok) {
+      return [...MOCK_MODELS];
+    }
+    const data = await res.json();
+    return Array.isArray(data) && data.length > 0 ? data : [...MOCK_MODELS];
   },
 
   async getFailedSamples(

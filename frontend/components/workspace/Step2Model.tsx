@@ -3,6 +3,7 @@
 import React from 'react';
 import { Check, Cpu, ShieldCheck, AlertCircle, Info, Sliders } from 'lucide-react';
 import { ModelAdapter, TaskType } from '@/lib/schemas';
+import { api } from '@/lib/api';
 import { MOCK_MODELS } from '@/lib/mocks/models';
 import { Badge } from '@/components/ui/Badge';
 import { Callout } from '@/components/ui/Callout';
@@ -22,12 +23,28 @@ export function Step2Model({
   onSelectModel,
   onUpdateParams,
 }: Step2ModelProps) {
+  const [models, setModels] = React.useState<ModelAdapter[]>(MOCK_MODELS);
+
+  React.useEffect(() => {
+    let mounted = true;
+    api.getModels()
+      .then((data) => {
+        if (mounted && Array.isArray(data) && data.length > 0) {
+          setModels(data);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   // Filter models compatible with current dataset task type
-  const compatibleModels = MOCK_MODELS.filter((m) =>
+  const compatibleModels = models.filter((m) =>
     m.taskTypes.includes(taskType)
   );
 
-  const selectedModel = MOCK_MODELS.find((m) => m.id === selectedModelId);
+  const selectedModel = models.find((m) => m.id === selectedModelId);
 
   const handleParamChange = (paramKey: string, val: any) => {
     onUpdateParams({

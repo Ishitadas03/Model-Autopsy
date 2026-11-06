@@ -1,15 +1,56 @@
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import Link from 'next/link';
-import { FileText, ArrowRight, ShieldCheck, Calendar, Activity } from 'lucide-react';
+import { FileText, ArrowRight, Calendar } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
-import { MOCK_EXPERIMENTS } from '@/lib/mocks/experiments';
+import { Skeleton } from '@/components/ui/Skeleton';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { ErrorState } from '@/components/ui/ErrorState';
+import { api } from '@/lib/api';
+import { Experiment } from '@/lib/schemas';
+
+function formatReportDate(isoString?: string | null): string {
+  if (!isoString) return 'Recent';
+  try {
+    const cleaned = isoString.replace(/\+00:00Z$/, 'Z').replace(/\+00:00$/, 'Z');
+    const d = new Date(cleaned);
+    if (isNaN(d.getTime())) return isoString.split('T')[0] || 'Recent';
+    return d.toLocaleDateString();
+  } catch {
+    return 'Recent';
+  }
+}
 
 export default function ReportsDirectoryPage() {
-  const completedExperiments = MOCK_EXPERIMENTS.filter((e) => e.status === 'completed');
+  const [experiments, setExperiments] = useState<Experiment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    loadReports();
+  }, []);
+
+  const loadReports = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const data = await api.getExperiments();
+      if (Array.isArray(data)) {
+        setExperiments(data);
+      } else {
+        setExperiments([]);
+      }
+    } catch (err: any) {
+      setError(err?.message || 'Failed to load report directory');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const completed = experiments.filter((e) => e && (e.status === 'completed' || e.results));
 
   return (
     <AppShell showSidebar>
@@ -39,65 +80,102 @@ export default function ReportsDirectoryPage() {
           </Link>
         </div>
 
-        {/* Reports Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {completedExperiments.map((exp) => (
-            <div
-              key={exp.id}
-              className="p-5 rounded-xl bg-surface border border-border hover:border-white/20 transition-all flex flex-col justify-between space-y-4"
-            >
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <FileText className="w-4 h-4 text-accent" />
-                    <span className="font-mono text-xs font-bold text-white">{exp.id}</span>
-                  </div>
-                  <Badge variant="accent" size="sm">
-                    {exp.taskType}
-                  </Badge>
-                </div>
-
-                <div>
-                  <h3 className="font-manrope font-semibold text-base text-white">
-                    {exp.modelName}
-                  </h3>
-                  <p className="text-xs text-text-subtle mt-0.5 font-cabin">
-                    Dataset: {exp.datasetName} · Perturbation: {exp.stressConfig?.type || 'Gaussian Noise'}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-2 text-xs font-mono p-3 rounded-lg bg-surface-2 border border-border">
-                  <div>
-                    <span className="text-[10px] text-text-subtle block">Observed Boundary</span>
-                    <span className="text-accent font-bold">
-                      {exp.results?.observedBoundary ? `${(exp.results.observedBoundary * 100).toFixed(1)}%` : '23.1%'}
-                    </span>
-                  </div>
-                  <div>
-                    <span className="text-[10px] text-text-subtle block">Worst-Case F1</span>
-                    <span className="text-white font-bold">
-                      {exp.results?.worstCaseMetrics?.f1 ? `${(exp.results.worstCaseMetrics.f1 * 100).toFixed(1)}%` : '71.2%'}
-                    </span>
-                  </div>
-                </div>
+        {/* Reports Content */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="p-5 rounded-xl bg-surface border border-border space-y-3">
+                <Skeleton className="h-4 w-32" />
+                <Skeleton className="h-6 w-3/4" />
+                <Skeleton className="h-16 w-full rounded-lg" />
               </div>
+            ))}
+          </div>
+        ) : error ? (
+          <ErrorState
+            title="Failed to load reports"
+            message={error}
+            onRetry={loadReports}
+          />
+        ) : completed.length === 0 ? (
+          <EmptyState
+            title="No completed reports yet"
+            description="Run and complete stress-test autopsies to view and export formal research reports."
+            actionLabel="Run New Autopsy"
+            onAction={() => window.location.assign('/workspace')}
+          />
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {completed.map((exp) => {
+              const boundary = exp.results?.observedBoundary;
+              const worstF1 =
+                exp.results?.worstCaseMetrics?.f1 ??
+                exp.results?.worstCaseMetrics?.[exp.metric] ??
+                (exp.results as any)?.worstCaseScore;
 
-              <div className="pt-3 border-t border-white/5 flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[11px] text-text-subtle font-mono">
-                  <Calendar className="w-3 h-3" />
-                  <span>{new Date(exp.createdAt).toLocaleDateString()}</span>
+              return (
+                <div
+                  key={exp.id}
+                  className="p-5 rounded-xl bg-surface border border-border hover:border-white/20 transition-all flex flex-col justify-between space-y-4"
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <FileText className="w-4 h-4 text-accent" />
+                        <span className="font-mono text-xs font-bold text-white">{exp.id}</span>
+                      </div>
+                      <Badge variant="accent" size="sm">
+                        {exp.taskType}
+                      </Badge>
+                    </div>
+
+                    <div>
+                      <h3 className="font-manrope font-semibold text-base text-white">
+                        {exp.modelName}
+                      </h3>
+                      <p className="text-xs text-text-subtle mt-0.5 font-cabin">
+                        Dataset: {exp.datasetName} · Perturbation: {exp.noiseType || exp.perturbationFamily || 'Stress Test'}
+                      </p>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 text-xs font-mono p-3 rounded-lg bg-surface-2 border border-border">
+                      <div>
+                        <span className="text-[10px] text-text-subtle block">Observed Boundary</span>
+                        <span className="text-accent font-bold">
+                          {boundary !== undefined && boundary !== null
+                            ? `${(Number(boundary) * 100).toFixed(1)}%`
+                            : 'N/A'}
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-text-subtle block">Worst-Case Score</span>
+                        <span className="text-white font-bold">
+                          {worstF1 !== undefined && worstF1 !== null
+                            ? `${(Number(worstF1) * 100).toFixed(1)}%`
+                            : 'N/A'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="pt-3 border-t border-white/5 flex items-center justify-between">
+                    <div className="flex items-center gap-1.5 text-[11px] text-text-subtle font-mono">
+                      <Calendar className="w-3 h-3" />
+                      <span>{formatReportDate(exp.createdAt)}</span>
+                    </div>
+
+                    <Link href={`/experiments/${exp.id}/report`}>
+                      <Button variant="secondary" size="sm" className="gap-1.5 text-xs">
+                        <span>View Formal Report</span>
+                        <ArrowRight className="w-3 h-3" />
+                      </Button>
+                    </Link>
+                  </div>
                 </div>
-
-                <Link href={`/experiments/${exp.id}/report`}>
-                  <Button variant="secondary" size="sm" className="gap-1.5 text-xs">
-                    <span>View Formal Report</span>
-                    <ArrowRight className="w-3 h-3" />
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </AppShell>
   );

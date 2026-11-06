@@ -19,12 +19,17 @@ interface ToastContextType {
 
 const ToastContext = createContext<ToastContextType | null>(null);
 
+const defaultToastContext: ToastContextType = {
+  toast: (item: Omit<ToastItem, 'id'>) => {
+    if (typeof window !== 'undefined') {
+      console.warn('Toast notification (outside provider):', item.title, item.message);
+    }
+  },
+};
+
 export function useToast() {
   const ctx = useContext(ToastContext);
-  if (!ctx) {
-    throw new Error('useToast must be used within ToastProvider');
-  }
-  return ctx;
+  return ctx || defaultToastContext;
 }
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {

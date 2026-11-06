@@ -2,7 +2,9 @@
 const backendApiUrl =
   process.env.BACKEND_API_URL ||
   process.env.NEXT_PUBLIC_BACKEND_URL ||
-  'http://127.0.0.1:8000';
+  (process.env.NODE_ENV === 'production'
+    ? 'https://model-autopsy-backend.onrender.com'
+    : 'http://127.0.0.1:8000');
 
 const nextConfig = {
   reactStrictMode: true,

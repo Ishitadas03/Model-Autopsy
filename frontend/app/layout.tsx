@@ -2,6 +2,7 @@ import type { Metadata } from 'next';
 import { Manrope, Cabin, Instrument_Serif, Inter } from 'next/font/google';
 import './globals.css';
 import { MotionProvider } from '@/components/motion/MotionProvider';
+import { ToastProvider } from '@/components/ui/Toast';
 import { GlobalAnimatedBackground } from '@/components/landing/GlobalAnimatedBackground';
 
 const manrope = Manrope({
@@ -51,8 +52,10 @@ export default function RootLayout({
     >
       <body className="min-h-screen bg-bg text-text font-inter selection:bg-accent/30 selection:text-white relative">
         <MotionProvider>
-          <GlobalAnimatedBackground />
-          <div className="relative z-10 min-h-screen flex flex-col">{children}</div>
+          <ToastProvider>
+            <GlobalAnimatedBackground />
+            <div className="relative z-10 min-h-screen flex flex-col">{children}</div>
+          </ToastProvider>
         </MotionProvider>
       </body>
     </html>

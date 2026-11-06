@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Check,
@@ -13,6 +13,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { Dataset } from '@/lib/schemas';
+import { api } from '@/lib/api';
 import { MOCK_DATASETS } from '@/lib/mocks/datasets';
 import { Badge } from '@/components/ui/Badge';
 import { Tabs } from '@/components/ui/Tabs';
@@ -29,8 +30,24 @@ export function Step1Dataset({
 }: Step1DatasetProps) {
   const [activeTab, setActiveTab] = useState<'popular' | 'custom' | 'upload'>('popular');
   const [searchQuery, setSearchQuery] = useState('');
+  const [datasets, setDatasets] = useState<Dataset[]>(MOCK_DATASETS);
+  const [loading, setLoading] = useState(false);
 
-  // Upload simulation state
+  useEffect(() => {
+    let mounted = true;
+    api.getDatasets()
+      .then((data) => {
+        if (mounted && Array.isArray(data) && data.length > 0) {
+          setDatasets(data);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
+  // Upload state
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
@@ -49,7 +66,7 @@ export function Step1Dataset({
     { id: 'upload', label: 'Upload CSV' },
   ];
 
-  const filteredDatasets = MOCK_DATASETS.filter((d) => {
+  const filteredDatasets = datasets.filter((d) => {
     if (activeTab === 'custom' && !d.isCustom) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
@@ -62,17 +79,17 @@ export function Step1Dataset({
     return true;
   });
 
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.name.endsWith('.csv')) {
+    if (!file.name.toLowerCase().endsWith('.csv')) {
       setUploadError('Only valid .csv files are supported.');
       return;
     }
 
-    if (file.size > 10 * 1024 * 1024) {
-      setUploadError('File size exceeds the 10 MB limit.');
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadError('File size exceeds the 25 MB limit.');
       return;
     }
 
@@ -85,40 +102,27 @@ export function Step1Dataset({
     setUploadedFile(file);
     setIsUploading(true);
 
-    // Simulate parse & schema detection
-    setTimeout(() => {
+    try {
+      const uploadedDs = await api.uploadDataset(file, {
+        name: file.name.replace(/\.csv$/i, ''),
+      });
+
       setIsUploading(false);
-      const schema = {
-        name: file.name.replace('.csv', ''),
-        sampleCount: 840,
-        featureCount: 6,
-        features: [
-          { name: 'feature_a', type: 'numeric' as const, missingCount: 0 },
-          { name: 'feature_b', type: 'numeric' as const, missingCount: 4 },
-          { name: 'category_c', type: 'categorical' as const, missingCount: 0 },
-          { name: 'score_d', type: 'numeric' as const, missingCount: 12 },
-          { name: 'metric_e', type: 'numeric' as const, missingCount: 0 },
-          { name: 'target', type: 'categorical' as const, missingCount: 0 },
-        ],
+      setUploadedSchema({
+        name: uploadedDs.name,
+        sampleCount: uploadedDs.sampleCount,
+        featureCount: uploadedDs.featureCount,
+        features: (uploadedDs.features as any) || [],
         targetColumn: 'target',
-        taskType: 'classification' as const,
-      };
-      setUploadedSchema(schema);
+        taskType: (uploadedDs.taskType as any) || 'classification',
+      });
 
-      const customDataset: Dataset = {
-        id: `custom-${Date.now()}`,
-        name: `${schema.name} (Uploaded)`,
-        description: `User-provided CSV with ${schema.sampleCount} rows and ${schema.featureCount} columns.`,
-        sampleCount: schema.sampleCount,
-        featureCount: schema.featureCount,
-        classCount: 2,
-        taskType: schema.taskType,
-        isCustom: true,
-        features: schema.features,
-      };
-
-      onSelectDataset(customDataset);
-    }, 900);
+      setDatasets((prev) => [uploadedDs, ...prev.filter((d) => d.id !== uploadedDs.id)]);
+      onSelectDataset(uploadedDs);
+    } catch (err: any) {
+      setIsUploading(false);
+      setUploadError(err?.message || 'Failed to upload dataset to storage.');
+    }
   };
 
   // Abstract SVG icon tile generator

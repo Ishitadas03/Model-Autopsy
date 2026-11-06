@@ -48,6 +48,30 @@ export async function GET(request: NextRequest) {
     const artifactPath = getCanonicalArtifactPath(format);
 
     if (!fs.existsSync(artifactPath)) {
+      const backendBase =
+        process.env.BACKEND_API_URL ||
+        process.env.NEXT_PUBLIC_BACKEND_URL ||
+        (process.env.NODE_ENV === 'production'
+          ? 'https://model-autopsy-backend.onrender.com'
+          : 'http://127.0.0.1:8000');
+
+      try {
+        const backendRes = await fetch(`${backendBase.replace(/\/$/, '')}/api/v1/experiments/e003?format=${format}`);
+        if (backendRes.ok) {
+          const contentType = backendRes.headers.get('content-type') || (format === 'csv' ? 'text/csv' : format === 'markdown' ? 'text/markdown' : 'application/json');
+          const body = await backendRes.text();
+          return new NextResponse(body, {
+            status: 200,
+            headers: {
+              'Content-Type': contentType,
+              'Content-Disposition': `inline; filename="aggregate_comparison.${format === 'markdown' ? 'md' : format}"`,
+            },
+          });
+        }
+      } catch {
+        // Fall back to 404 response
+      }
+
       return NextResponse.json(
         {
           error: 'E003 canonical artifact not found. Please ensure the experiment pipeline has run.',

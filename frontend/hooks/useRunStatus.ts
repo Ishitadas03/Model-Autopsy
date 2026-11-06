@@ -35,7 +35,7 @@ export function useRunStatus(experimentId: string): UseRunStatusResult {
   const [completedStages, setCompletedStages] = useState<string[]>([]);
   const [elapsedSeconds, setElapsedSeconds] = useState(0);
 
-  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
 
   const fetchStatus = async () => {
@@ -51,8 +51,26 @@ export function useRunStatus(experimentId: string): UseRunStatusResult {
         setProgressPercent(100);
         setCurrentStage('Complete');
         setCompletedStages(STAGES);
-      } else if (data.status === 'failed' || data.status === 'cancelled') {
-        // Stop progression
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      } else if (data.status === 'failed') {
+        setError(data.errorMessage || 'Experiment execution failed.');
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      } else if (data.status === 'cancelled') {
+        setError('Experiment run was cancelled.');
+        if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
+      } else if (data.status === 'running') {
+        const pct = Math.max(10, Math.min(95, data.progressPercent || 15));
+        setProgressPercent(pct);
+        const stageIndex = Math.min(
+          STAGES.length - 1,
+          Math.floor((pct / 100) * STAGES.length)
+        );
+        setCurrentStage(STAGES[stageIndex]);
+        setCompletedStages(STAGES.slice(0, stageIndex));
+      } else {
+        // Queued
+        setProgressPercent(5);
+        setCurrentStage('Queued for Execution');
       }
     } catch (err: any) {
       setError(err?.message || 'Failed to poll experiment status');
@@ -69,35 +87,19 @@ export function useRunStatus(experimentId: string): UseRunStatusResult {
       setElapsedSeconds((prev) => prev + 1);
     }, 1000);
 
-    // Progress simulation loop if running/queued
-    intervalRef.current = setInterval(() => {
-      setProgressPercent((prev) => {
-        if (prev >= 100) {
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          return 100;
-        }
-
-        const next = Math.min(100, prev + Math.floor(Math.random() * 5) + 3);
-        const stageIndex = Math.min(
-          STAGES.length - 1,
-          Math.floor((next / 100) * STAGES.length)
-        );
-
-        setCurrentStage(STAGES[stageIndex]);
-        setCompletedStages(STAGES.slice(0, stageIndex));
-
-        return next;
-      });
-    }, 800);
+    // Real backend polling interval every 2.5s
+    pollIntervalRef.current = setInterval(() => {
+      fetchStatus();
+    }, 2500);
 
     return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
+      if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
       if (timerRef.current) clearInterval(timerRef.current);
     };
   }, [experimentId]);
 
   const cancelRun = async (): Promise<boolean> => {
-    if (intervalRef.current) clearInterval(intervalRef.current);
+    if (pollIntervalRef.current) clearInterval(pollIntervalRef.current);
     if (timerRef.current) clearInterval(timerRef.current);
 
     const res = await api.cancelExperiment(experimentId);

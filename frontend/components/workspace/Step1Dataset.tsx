@@ -51,6 +51,7 @@ export function Step1Dataset({
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
+  const [currentUploadedDs, setCurrentUploadedDs] = useState<Dataset | null>(null);
   const [uploadedSchema, setUploadedSchema] = useState<{
     name: string;
     sampleCount: number;
@@ -118,17 +119,30 @@ export function Step1Dataset({
         taskType: cleanTaskType,
       };
 
+      const detectedTarget =
+        cleanDs.targetName ||
+        (cleanDs.features && cleanDs.features.length > 0
+          ? cleanDs.features[cleanDs.features.length - 1].name
+          : 'target');
+
+      const fullDs: Dataset = {
+        ...cleanDs,
+        targetName: detectedTarget,
+      };
+
+      setCurrentUploadedDs(fullDs);
+
       setUploadedSchema({
         name: cleanDs.name,
         sampleCount: cleanDs.sampleCount,
         featureCount: cleanDs.featureCount,
         features: (cleanDs.features as any) || [],
-        targetColumn: 'target',
+        targetColumn: detectedTarget,
         taskType: cleanTaskType,
       });
 
-      setDatasets((prev) => [cleanDs, ...prev.filter((d) => d.id !== cleanDs.id)]);
-      onSelectDataset(cleanDs);
+      setDatasets((prev) => [fullDs, ...prev.filter((d) => d.id !== fullDs.id)]);
+      onSelectDataset(fullDs);
     } catch (err: any) {
       setIsUploading(false);
       setUploadError(err?.message || 'Failed to upload dataset to storage.');
@@ -231,13 +245,26 @@ export function Step1Dataset({
                 </Badge>
               </div>
 
-              {/* Warnings check */}
-              <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 border border-warning/20 p-2.5 rounded-lg">
-                <AlertTriangle className="w-4 h-4 flex-shrink-0" />
-                <span>
-                  16 missing values detected in feature columns. Missingness will be handled during baseline evaluation.
-                </span>
-              </div>
+              {/* Missingness status check */}
+              {(() => {
+                const missingCount = uploadedSchema.features.reduce(
+                  (acc, f) => acc + (f.missingCount || 0),
+                  0
+                );
+                return missingCount > 0 ? (
+                  <div className="flex items-center gap-2 text-xs text-warning bg-warning/10 border border-warning/20 p-2.5 rounded-lg">
+                    <AlertTriangle className="w-4 h-4 flex-shrink-0" />
+                    <span>
+                      {missingCount} missing value{missingCount === 1 ? '' : 's'} detected in feature columns. Missingness will be imputed during baseline evaluation.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-2 text-xs text-success bg-success/10 border border-success/20 p-2.5 rounded-lg">
+                    <Check className="w-4 h-4 flex-shrink-0 text-success" />
+                    <span>Complete tabular dataset — zero missing values detected.</span>
+                  </div>
+                );
+              })()}
 
               <div className="grid grid-cols-2 gap-4 pt-2">
                 <div>
@@ -246,9 +273,15 @@ export function Step1Dataset({
                   </label>
                   <select
                     value={uploadedSchema.targetColumn}
-                    onChange={(e) =>
-                      setUploadedSchema({ ...uploadedSchema, targetColumn: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const newTarget = e.target.value;
+                      setUploadedSchema((prev) => (prev ? { ...prev, targetColumn: newTarget } : null));
+                      if (currentUploadedDs) {
+                        const updated = { ...currentUploadedDs, targetName: newTarget };
+                        setCurrentUploadedDs(updated);
+                        onSelectDataset(updated);
+                      }
+                    }}
                     className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
                   >
                     {uploadedSchema.features.map((f) => (
@@ -265,12 +298,15 @@ export function Step1Dataset({
                   </label>
                   <select
                     value={uploadedSchema.taskType}
-                    onChange={(e) =>
-                      setUploadedSchema({
-                        ...uploadedSchema,
-                        taskType: e.target.value as 'classification' | 'regression',
-                      })
-                    }
+                    onChange={(e) => {
+                      const newTaskType = e.target.value as 'classification' | 'regression';
+                      setUploadedSchema((prev) => (prev ? { ...prev, taskType: newTaskType } : null));
+                      if (currentUploadedDs) {
+                        const updated = { ...currentUploadedDs, taskType: newTaskType };
+                        setCurrentUploadedDs(updated);
+                        onSelectDataset(updated);
+                      }
+                    }}
                     className="w-full bg-surface-2 border border-border rounded-lg px-3 py-2 text-xs text-white focus:outline-none"
                   >
                     <option value="classification">Classification (discrete targets)</option>

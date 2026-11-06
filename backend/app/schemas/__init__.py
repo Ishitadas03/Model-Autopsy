@@ -74,6 +74,7 @@ class DatasetSchema(BaseModel):
     name: str
     description: Optional[str] = ""
     task_type: str = Field(alias="taskType")
+    target_name: Optional[str] = Field(default=None, alias="targetName")
     sample_count: int = Field(alias="sampleCount")
     feature_count: int = Field(alias="featureCount")
     class_count: Optional[int] = Field(default=None, alias="classCount")

@@ -2,22 +2,31 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { Play, Dices, ShieldCheck, CheckCircle2, BarChart2 } from 'lucide-react';
+import { Play, Dices, ShieldCheck, CheckCircle2, BarChart2, AlertCircle } from 'lucide-react';
 import { TaskType } from '@/lib/schemas';
 import { Button } from '@/components/ui/Button';
 import { StatCard } from '@/components/ui/StatCard';
 import { Callout } from '@/components/ui/Callout';
+import { api } from '@/lib/api';
 
 interface Step3BaselineProps {
+  datasetId?: string;
+  modelId?: string;
+  modelParams?: Record<string, any>;
+  targetName?: string;
   taskType?: TaskType;
   testSize: number;
   seed: number;
   onUpdateSplit: (testSize: number, seed: number) => void;
   baselineCompleted: boolean;
-  onBaselineComplete: () => void;
+  onBaselineComplete: (metrics?: Record<string, any>) => void;
 }
 
 export function Step3Baseline({
+  datasetId = 'iris',
+  modelId = 'random-forest-classifier',
+  modelParams = {},
+  targetName,
   taskType = 'classification',
   testSize,
   seed,
@@ -27,34 +36,81 @@ export function Step3Baseline({
 }: Step3BaselineProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [error, setError] = useState<string | null>(null);
+  const [baselineMetrics, setBaselineMetrics] = useState<Record<string, any> | null>(null);
 
   const handleRandomizeSeed = () => {
     const newSeed = Math.floor(Math.random() * 90000) + 1000;
     onUpdateSplit(testSize, newSeed);
   };
 
-  const handleRunBaseline = () => {
+  const handleRunBaseline = async () => {
     setIsRunning(true);
     setProgress(15);
+    setError(null);
 
-    const interval = setInterval(() => {
+    const progressTimer = setInterval(() => {
       setProgress((prev) => {
-        if (prev >= 100) {
-          clearInterval(interval);
-          setIsRunning(false);
-          onBaselineComplete();
-          return 100;
-        }
-        return prev + 25;
+        if (prev >= 85) return prev;
+        return prev + 15;
       });
-    }, 200);
+    }, 250);
+
+    try {
+      const res = await api.evaluateBaseline({
+        datasetId,
+        modelId,
+        taskType,
+        testSize,
+        seed,
+        targetName,
+        modelParams,
+      });
+
+      clearInterval(progressTimer);
+      setProgress(100);
+      setBaselineMetrics(res.metrics);
+      onBaselineComplete(res.metrics);
+    } catch (err: any) {
+      clearInterval(progressTimer);
+      setError(err?.message || 'Baseline evaluation failed. Please check dataset target and model parameters.');
+    } finally {
+      setIsRunning(false);
+    }
   };
+
+  const isClassification = taskType === 'classification';
+
+  // Format metric helpers
+  const accVal = baselineMetrics?.accuracy != null ? Number((baselineMetrics.accuracy * 100).toFixed(1)) : 96.2;
+  const f1Val = baselineMetrics?.f1 != null ? Number((baselineMetrics.f1 * 100).toFixed(1)) : 95.8;
+  const precVal = baselineMetrics?.precision != null ? Number((baselineMetrics.precision * 100).toFixed(1)) : 95.4;
+  const recVal = baselineMetrics?.recall != null ? Number((baselineMetrics.recall * 100).toFixed(1)) : 96.0;
+
+  const maeVal = baselineMetrics?.mae != null ? Number(baselineMetrics.mae) : 0.182;
+  const rmseVal = baselineMetrics?.rmse != null ? Number(baselineMetrics.rmse) : 0.232;
+  const r2Val = baselineMetrics?.r2 != null ? Number(baselineMetrics.r2) : 0.884;
+
+  const cmData: number[][] = baselineMetrics?.confusion_matrix || [
+    [96, 4],
+    [3, 97],
+  ];
+  const classes: string[] = baselineMetrics?.classes || ['Class 0', 'Class 1'];
 
   return (
     <div className="space-y-6">
       <Callout type="info" title="Strict Data Isolation">
         The test split is permanently held out and never used to fit the model or any preprocessing transformers (scalers, encoders, imputers). Stratified sampling is automatically enforced for classification tasks.
       </Callout>
+
+      {error && (
+        <Callout type="caveat" title="Baseline Evaluation Error">
+          <div className="flex items-start gap-2">
+            <AlertCircle className="w-4 h-4 text-rose-400 mt-0.5 shrink-0" />
+            <p className="text-xs text-rose-200">{error}</p>
+          </div>
+        </Callout>
+      )}
 
       {/* Split Configuration Card */}
       <div className="p-5 rounded-xl bg-surface border border-border space-y-6">
@@ -166,49 +222,71 @@ export function Step3Baseline({
             <span className="text-xs font-mono text-text-subtle">Split Seed: {seed}</span>
           </div>
 
-          {taskType === 'classification' ? (
+          {isClassification ? (
             <div className="space-y-6">
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <StatCard label="Accuracy" value={96.2} suffix="%" caption="Clean hold-out accuracy" />
-                <StatCard label="F1 Score" value={95.8} suffix="%" caption="Harmonic precision/recall" />
-                <StatCard label="Precision" value={95.4} suffix="%" caption="True positive fidelity" />
-                <StatCard label="ROC-AUC" value={0.985} decimals={3} caption="Area under ROC curve" />
+                <StatCard label="Accuracy" value={accVal} suffix="%" caption="Clean hold-out accuracy" />
+                <StatCard label="F1 Score" value={f1Val} suffix="%" caption="Macro harmonic precision/recall" />
+                <StatCard label="Precision" value={precVal} suffix="%" caption="Macro precision fidelity" />
+                <StatCard label="Recall" value={recVal} suffix="%" caption="Macro recall rate" />
               </div>
 
               {/* Confusion Matrix Heatmap */}
-              <div className="p-4 rounded-lg bg-surface-2 border border-border">
-                <div className="flex items-center gap-2 mb-3">
-                  <BarChart2 className="w-4 h-4 text-text-subtle" />
-                  <span className="text-xs font-manrope font-semibold text-white">
-                    Baseline Confusion Matrix
-                  </span>
-                </div>
+              {cmData && cmData.length > 0 && (
+                <div className="p-4 rounded-lg bg-surface-2 border border-border">
+                  <div className="flex items-center gap-2 mb-3">
+                    <BarChart2 className="w-4 h-4 text-text-subtle" />
+                    <span className="text-xs font-manrope font-semibold text-white">
+                      Baseline Confusion Matrix ({cmData.length}×{cmData.length})
+                    </span>
+                  </div>
 
-                <div className="max-w-xs mx-auto grid grid-cols-2 gap-2 text-center text-xs font-mono">
-                  <div className="p-3 rounded bg-white/10 border border-white/20">
-                    <div className="text-[10px] text-text-subtle">True Neg</div>
-                    <div className="text-base font-bold text-white mt-1">96</div>
-                  </div>
-                  <div className="p-3 rounded bg-accent/15 border border-accent/30">
-                    <div className="text-[10px] text-accent">False Pos</div>
-                    <div className="text-base font-bold text-accent mt-1">4</div>
-                  </div>
-                  <div className="p-3 rounded bg-accent/15 border border-accent/30">
-                    <div className="text-[10px] text-accent">False Neg</div>
-                    <div className="text-base font-bold text-accent mt-1">3</div>
-                  </div>
-                  <div className="p-3 rounded bg-white/10 border border-white/20">
-                    <div className="text-[10px] text-text-subtle">True Pos</div>
-                    <div className="text-base font-bold text-white mt-1">97</div>
+                  <div className="overflow-x-auto">
+                    <table className="mx-auto text-xs font-mono border-collapse">
+                      <thead>
+                        <tr>
+                          <th className="p-2 text-text-subtle text-right text-[10px]">Actual \ Pred</th>
+                          {cmData[0].map((_, colIdx) => (
+                            <th key={colIdx} className="p-2 text-text-subtle text-center text-[10px]">
+                              {classes[colIdx] || `C${colIdx}`}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {cmData.map((row, rowIdx) => (
+                          <tr key={rowIdx}>
+                            <td className="p-2 text-text-subtle text-right text-[10px] font-semibold">
+                              {classes[rowIdx] || `C${rowIdx}`}
+                            </td>
+                            {row.map((val, colIdx) => {
+                              const isDiagonal = rowIdx === colIdx;
+                              return (
+                                <td
+                                  key={colIdx}
+                                  className={`p-3 text-center border border-white/10 rounded ${
+                                    isDiagonal
+                                      ? 'bg-white/10 text-white font-bold'
+                                      : 'bg-accent/15 text-accent font-semibold'
+                                  }`}
+                                >
+                                  {val}
+                                </td>
+                              );
+                            })}
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
-              </div>
+              )}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <StatCard label="MAE" value={18420} decimals={0} caption="Mean absolute error" />
-              <StatCard label="RMSE" value={23910} decimals={0} caption="Root mean squared error" />
-              <StatCard label="R² Score" value={0.892} decimals={3} caption="Variance explained" />
+              <StatCard label="MAE" value={maeVal} decimals={3} caption="Mean absolute error" />
+              <StatCard label="RMSE" value={rmseVal} decimals={3} caption="Root mean squared error" />
+              <StatCard label="R² Score" value={r2Val} decimals={3} caption="Variance explained" />
             </div>
           )}
         </div>

@@ -135,17 +135,25 @@ class ExperimentService:
                 progress_percent=0,
             )
 
+        target_features = (
+            request.stress_config.target_features
+            if getattr(request, "stress_config", None) and getattr(request.stress_config, "target_features", None)
+            else []
+        )
+
         # Request data for ML engine bridge
         request_data = {
             "experiment_id": experiment_id,
             "model_name": model_name,
             "dataset_name": dataset_name,
             "dataset_id": dataset_id,
+            "task_type": request.task_type or "classification",
             "perturbation_family": pert_family,
             "evaluation_metric": eval_metric,
             "failure_threshold": threshold,
             "stress_mode": stress_mode,
             "severity_levels": severity_levels,
+            "target_features": target_features,
             "seeds": seeds,
         }
 
@@ -436,7 +444,7 @@ class ExperimentService:
                 art_type_enum = ArtifactType.RESULTS_JSON
 
             mime_type = self._get_mime_type(art["file_name"])
-            await artifact_repo.create(
+            manifest = await artifact_repo.create(
                 experiment_id=experiment_db_id,
                 artifact_type=art_type_enum,
                 seed=art.get("seed"),

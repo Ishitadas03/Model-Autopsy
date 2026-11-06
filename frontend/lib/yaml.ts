@@ -1,7 +1,9 @@
 export interface WorkspaceConfig {
   datasetId?: string;
   datasetName?: string;
+  targetColumn?: string;
   taskType?: 'classification' | 'regression';
+  features?: { name: string; type: string; missingCount?: number }[];
   modelId?: string;
   modelName?: string;
   modelParams?: Record<string, any>;

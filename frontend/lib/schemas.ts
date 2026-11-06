@@ -51,6 +51,7 @@ export const DatasetSchema = z.object({
   featureCount: z.number(),
   classCount: z.number().optional(),
   taskType: TaskTypeSchema,
+  targetName: z.string().optional(),
   isCustom: z.boolean().default(false),
   features: z.array(DatasetFeatureSchema),
 });

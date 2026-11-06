@@ -355,6 +355,7 @@ def _dataset_to_schema(dataset) -> DatasetSchema:
         name=dataset.name,
         description=dataset.description or "",
         taskType=dataset.task_type,
+        targetName=dataset.target_name,
         sampleCount=dataset.sample_count,
         featureCount=dataset.feature_count,
         classCount=class_cnt,

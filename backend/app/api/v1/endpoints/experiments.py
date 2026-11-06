@@ -87,6 +87,25 @@ async def create_experiment(
     return _experiment_to_detail(experiment)
 
 
+@router.post("/baseline")
+async def evaluate_baseline_endpoint(
+    request: dict,
+    session: AsyncSession = Depends(get_session),
+):
+    """Execute holdout baseline training and return real scientific metrics."""
+    from app.services.baseline_service import baseline_service, BaselineEvaluationRequest
+
+    try:
+        req_obj = BaselineEvaluationRequest(**request)
+        res = await baseline_service.evaluate_baseline(req_obj, session)
+        return res.model_dump(by_alias=True)
+    except Exception as e:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=f"Baseline evaluation failed: {str(e)}",
+        )
+
+
 @router.post("/{experiment_id}/cancel", response_model=ExperimentCancelResponse)
 async def cancel_experiment(
     experiment_id: str,

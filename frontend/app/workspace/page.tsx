@@ -173,6 +173,8 @@ function WorkspaceContent() {
                         datasetId: d.id,
                         datasetName: d.name,
                         taskType: d.taskType,
+                        targetColumn: d.targetName || prev.targetColumn || 'target',
+                        features: d.features,
                         // Reset target features if dataset changes
                         targetFeatures: [],
                       }));
@@ -201,6 +203,10 @@ function WorkspaceContent() {
 
                 {currentStep === 3 && (
                   <Step3Baseline
+                    datasetId={config.datasetId}
+                    modelId={config.modelId}
+                    modelParams={config.modelParams}
+                    targetName={config.targetColumn}
                     taskType={config.taskType}
                     testSize={config.testSize}
                     seed={config.seed}
@@ -219,6 +225,9 @@ function WorkspaceContent() {
                     severityLevels={config.severityLevels}
                     stressMode={config.stressMode}
                     targetFeatures={config.targetFeatures || []}
+                    datasetFeatures={
+                      config.features?.map((f: any) => (typeof f === 'string' ? f : f.name)) || []
+                    }
                     metric={config.metric}
                     failureThreshold={config.failureThreshold}
                     onUpdateStress={(updates) => {

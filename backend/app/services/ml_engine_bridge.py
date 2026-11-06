@@ -49,8 +49,15 @@ class MLEngineBridge:
         self.ml_engine_path = settings.ML_ENGINE_PATH
         self._running_processes: Dict[str, asyncio.subprocess.Process] = {}
 
-    def _get_script_path(self, experiment_type: str) -> Path:
+    def _get_script_path(self, experiment_type: str, dataset_id: Optional[str] = None) -> Path:
         """Get the script path for an experiment type."""
+        if dataset_id:
+            ds_clean = str(dataset_id).strip().lower()
+            if ds_clean not in ("iris", "iris-dataset", "fisher-iris", "german-credit", "german_credit"):
+                generic_script = self.scripts_dir / "run_generic.py"
+                if generic_script.exists():
+                    return generic_script
+
         script_map = {
             "e001": "run_e001.py",
             "e002": "run_e002.py",
@@ -58,10 +65,11 @@ class MLEngineBridge:
             "e004": "run_e004.py",
             "e005": "run_e005.py",
             "e006": "run_e006.py",
+            "generic": "run_generic.py",
         }
         script_name = script_map.get(experiment_type.lower())
         if not script_name:
-            script_name = "run_e001.py"
+            script_name = "run_generic.py" if (self.scripts_dir / "run_generic.py").exists() else "run_e001.py"
         return self.scripts_dir / script_name
 
     def _generate_config_yaml(self, request_data: Dict[str, Any], output_dir: Path) -> Path:
@@ -74,6 +82,7 @@ class MLEngineBridge:
         config = {
             "experiment": {
                 "name": request_data.get("experiment_id", "custom_experiment"),
+                "task_type": request_data.get("task_type", "classification"),
                 "model": {
                     "name": request_data.get("model_name", "RandomForestClassifier"),
                     "type": request_data.get("model_type", "sklearn_rf"),
@@ -83,11 +92,13 @@ class MLEngineBridge:
                     "name": request_data.get("dataset_name", "Iris Dataset"),
                     "id": request_data.get("dataset_id", "iris"),
                     "path": request_data.get("dataset_path"),
+                    "target_column": request_data.get("target_column") or request_data.get("target_name"),
                 },
                 "stress_test": {
                     "perturbation_family": request_data.get("perturbation_family", "gaussian_noise"),
                     "severity_levels": severity_levels,
                     "stress_mode": request_data.get("stress_mode", "incremental"),
+                    "target_features": request_data.get("target_features", []),
                 },
                 "evaluation": {
                     "metric": request_data.get("evaluation_metric", "f1"),
@@ -115,7 +126,7 @@ class MLEngineBridge:
         progress_callback=None,
     ) -> Dict[str, Any]:
         """Run an ML engine experiment asynchronously."""
-        script_path = self._get_script_path(experiment_type)
+        script_path = self._get_script_path(experiment_type, request_data.get("dataset_id"))
 
         # Create output directory
         output_dir = self.artifacts_dir / experiment_id
@@ -135,7 +146,10 @@ class MLEngineBridge:
             str(output_dir),
         ]
 
-        if experiment_type.lower() == "e001":
+        if script_path.name == "run_generic.py":
+            cmd.append("--seeds")
+            cmd.extend([str(s) for s in seeds])
+        elif experiment_type.lower() == "e001":
             if len(seeds) > 1:
                 cmd.append("--multi-seed")
             else:

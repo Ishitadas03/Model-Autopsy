@@ -240,5 +240,64 @@ export const api = {
     const res = await fetch(`/api/experiments/${_experimentId}/failures?page=${page}&limit=${pageSize}`);
     return res.json();
   },
+
+  async evaluateBaseline(config: {
+    datasetId: string;
+    modelId?: string;
+    taskType?: string;
+    testSize?: number;
+    seed?: number;
+    targetName?: string;
+    modelParams?: Record<string, any>;
+  }): Promise<{
+    datasetId: string;
+    modelId: string;
+    taskType: string;
+    sampleCount: number;
+    trainCount: number;
+    testCount: number;
+    targetName: string;
+    featureNames: string[];
+    metrics: Record<string, any>;
+  }> {
+    if (USE_MOCKS) {
+      await new Promise((r) => setTimeout(r, 400));
+      return {
+        datasetId: config.datasetId,
+        modelId: config.modelId || 'random-forest-classifier',
+        taskType: config.taskType || 'classification',
+        sampleCount: 150,
+        trainCount: 120,
+        testCount: 30,
+        targetName: config.targetName || 'target',
+        featureNames: ['feature_1', 'feature_2', 'feature_3', 'feature_4'],
+        metrics:
+          config.taskType === 'regression'
+            ? { mae: 0.182, mse: 0.054, rmse: 0.232, r2: 0.884 }
+            : { accuracy: 0.9667, precision: 0.9667, recall: 0.9667, f1: 0.9667 },
+      };
+    }
+
+    const res = await fetch('/api/experiments/baseline', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        datasetId: config.datasetId,
+        modelId: config.modelId || 'random-forest-classifier',
+        taskType: config.taskType || 'classification',
+        testSize: config.testSize ?? 0.2,
+        seed: config.seed ?? 42,
+        targetName: config.targetName,
+        modelParams: config.modelParams || {},
+      }),
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      throw new Error(err.detail || `Baseline evaluation failed (HTTP ${res.status})`);
+    }
+
+    return res.json();
+  },
 };
 

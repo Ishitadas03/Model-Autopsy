@@ -48,3 +48,19 @@ def test_invalid_metric_is_rejected(tmp_path):
     (tmp_path / "results.json").write_text(json.dumps(data), encoding="utf-8")
     with pytest.raises(ValueError, match="non-finite metric"):
         MLEngineBridge()._parse_results(tmp_path, [42], {})
+
+
+def test_multiseed_aggregate_uses_actual_severity_zero_as_baseline(tmp_path):
+    data = {
+        "severity_aggregates": [
+            {"severity": 0.0, "macro_f1": {"mean": 0.9265}, "accuracy": {"mean": 0.9267}},
+            {"severity": 0.3, "macro_f1": {"mean": 0.81}, "accuracy": {"mean": 0.82}},
+        ],
+        "mean_observed_boundary": None,
+    }
+    (tmp_path / "aggregate_results.json").write_text(json.dumps(data), encoding="utf-8")
+    parsed = MLEngineBridge()._parse_results(tmp_path, [42, 123], {})
+    assert parsed["baseline_macro_f1"] == 0.9265
+    assert parsed["baseline_accuracy"] == 0.9267
+    assert parsed["worst_case_macro_f1"] == 0.81
+    assert parsed["observed_boundary"] is None

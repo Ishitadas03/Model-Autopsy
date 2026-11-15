@@ -50,6 +50,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     except Exception as e:
         logger.error("Database not ready; experiment worker will not start: %s", e)
 
+    app.state.embedded_worker_task = None
     if settings.JOB_EXECUTION_MODE == "embedded":
         if database_ready:
             from app.workers.experiment_worker import serve_jobs
@@ -58,6 +59,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
                 serve_jobs(worker_shutdown),
                 name="embedded-durable-ml-queue",
             )
+            app.state.embedded_worker_task = worker_task
             logger.warning(
                 "Embedded free-tier worker active: jobs may be interrupted "
                 "by Render spin-down or instance restart"

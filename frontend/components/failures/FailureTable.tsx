@@ -99,7 +99,7 @@ export function FailureTable({
                   </TableCell>
 
                   <TableCell className="font-mono text-xs tabular-nums text-text-muted">
-                    {(sample.confidence * 100).toFixed(1)}%
+                    {sample.confidence === null ? 'N/A' : `${(sample.confidence * 100).toFixed(1)}%`}
                   </TableCell>
 
                   <TableCell className="font-mono text-xs text-text-subtle">

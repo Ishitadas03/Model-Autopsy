@@ -7,7 +7,7 @@ describe('EXP-0241 Hero Experiment Internal Consistency', () => {
     expect(HERO_EXPERIMENT.id).toBe('EXP-0241');
     expect(HERO_EXPERIMENT.modelName).toBe('Random Forest');
     expect(HERO_EXPERIMENT.datasetName).toBe('Credit Risk Demo (synthetic)');
-    expect(HERO_EXPERIMENT.stressConfig.type).toBe('gaussian_noise');
+    expect(HERO_EXPERIMENT.stressConfig?.type).toBe('gaussian_noise');
 
     const results = HERO_EXPERIMENT.results!;
     expect(results.baselineMetrics.f1).toBe(0.958);

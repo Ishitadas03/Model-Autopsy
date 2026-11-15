@@ -1,7 +1,8 @@
 """Health check and storage observability endpoints."""
 
 import asyncio
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -41,6 +42,45 @@ async def health_check(request: Request, session: AsyncSession = Depends(get_ses
     }
 
 
+@router.get("/ready", response_model=dict)
+async def readiness() -> JSONResponse:
+    """Deployment gate: only ready with migrated DB, auth config, and durable R2."""
+    checks = {"database": False, "authentication": False, "r2_storage": False}
+    try:
+        from app.core.database import async_session_factory
+        async with async_session_factory() as session:
+            version = (await session.execute(text("SELECT version_num FROM alembic_version"))).scalar_one_or_none()
+            checks["database"] = version == "003_durable_jobs"
+    except Exception:
+        pass
+
+    checks["authentication"] = (
+        settings.APP_ENV != "production"
+        or (settings.AUTH_REQUIRED and bool(settings.SUPABASE_URL))
+    )
+    if settings.APP_ENV == "production":
+        try:
+            access = await asyncio.wait_for(
+                asyncio.to_thread(storage_service.check_bucket_access), timeout=6
+            )
+            checks["r2_storage"] = (
+                settings.STORAGE_PROVIDER == "r2"
+                and storage_service.is_configured()
+                and bool(access.get("accessible"))
+            )
+        except Exception:
+            checks["r2_storage"] = False
+    else:
+        checks["r2_storage"] = True
+
+    ready = all(checks.values())
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"status": "ready" if ready else "not_ready", "checks": checks},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.get("/storage/status", response_model=dict)
 async def storage_status() -> dict:
     """Detailed Cloudflare R2 and local storage status verification."""
@@ -51,6 +91,5 @@ async def storage_status() -> dict:
         "bucket_name": storage_service.bucket_name,
         "bucket_accessible": access_check.get("accessible", False),
         "access_details": access_check,
-        "local_datasets_dir": str(storage_service.get_local_path("datasets")),
-        "local_artifacts_dir": str(storage_service.get_local_path("experiments")),
+
     }

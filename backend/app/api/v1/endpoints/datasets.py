@@ -187,7 +187,17 @@ async def upload_dataset(
             detail="Only CSV files (.csv) are accepted for dataset upload.",
         )
 
-    content = await file.read(MAX_FILE_SIZE_BYTES + 1)
+    max_size = (
+        min(MAX_FILE_SIZE_BYTES, settings.EMBEDDED_MAX_CSV_BYTES)
+        if settings.JOB_EXECUTION_MODE == "embedded"
+        else MAX_FILE_SIZE_BYTES
+    )
+    content = await file.read(max_size + 1)
+    if len(content) > max_size:
+        raise HTTPException(
+            status_code=413,
+            detail=f"CSV exceeds the free-tier limit of {max_size // (1024 * 1024)} MB.",
+        )
     if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -233,6 +243,17 @@ async def upload_dataset(
 
     # 3. Parse and validate CSV data
     parsed_info = validate_and_parse_csv(content, target_name=target_name)
+    if (
+        settings.JOB_EXECUTION_MODE == "embedded"
+        and parsed_info["sample_count"] > settings.EMBEDDED_MAX_CSV_ROWS
+    ):
+        raise HTTPException(
+            status_code=413,
+            detail=(
+                f"Free tier supports up to {settings.EMBEDDED_MAX_CSV_ROWS} rows; "
+                "use a smaller representative sample for this demo."
+            ),
+        )
 
     # 4. Store in Cloudflare R2 / Local fallback
     object_key = f"datasets/{cleaned_id}/data.csv"

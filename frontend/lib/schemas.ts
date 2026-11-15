@@ -147,7 +147,7 @@ export const FailedSampleSchema = z.object({
   sampleIndex: z.number(),
   trueLabel: z.union([z.string(), z.number()]),
   predictedLabel: z.union([z.string(), z.number()]),
-  confidence: z.number(),
+  confidence: z.number().nullable(),
   stressType: StressTypeSchema,
   severity: z.number(),
   features: z.record(

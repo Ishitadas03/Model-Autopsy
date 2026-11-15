@@ -32,6 +32,7 @@ from sklearn.metrics import (
 from app.core.logging import get_logger
 from app.repositories.dataset import DatasetRepository
 from app.services.preprocessing import prepare_holdout
+from app.services.model_limits import validate_model_params
 from app.services.storage_service import storage_service
 
 logger = get_logger(__name__)
@@ -213,36 +214,65 @@ class BaselineService:
     def _instantiate_model(
         self, model_id: str, is_classification: bool, seed: int, params: Dict[str, Any]
     ) -> Any:
-        """Instantiate scikit-learn model with parameters."""
+        """Use only bounded supported hyperparameters; no arbitrary fallback."""
+        task = "classification" if is_classification else "regression"
+        p = validate_model_params(model_id, task, params)
         m_id = model_id.lower()
 
         if is_classification:
             if "random" in m_id or "rf" in m_id:
-                n_est = int(params.get("n_estimators", 100))
-                max_d = int(params["max_depth"]) if params.get("max_depth") else None
-                return RandomForestClassifier(n_estimators=n_est, max_depth=max_d, random_state=seed)
+                return RandomForestClassifier(
+                    n_estimators=p.get("n_estimators", 100),
+                    max_depth=p.get("max_depth"),
+                    min_samples_split=p.get("min_samples_split", 2),
+                    random_state=seed,
+                )
             if "logistic" in m_id or "lr" in m_id:
-                c_val = float(params.get("C", 1.0))
-                return LogisticRegression(C=c_val, max_iter=500, random_state=seed)
+                return LogisticRegression(
+                    C=p.get("C", 1.0), max_iter=p.get("max_iter", 500),
+                    penalty=p.get("penalty", "l2"),
+                    solver=p.get("solver", "lbfgs"),
+                    random_state=seed,
+                )
             if "gradient" in m_id or "gb" in m_id:
-                n_est = int(params.get("n_estimators", 100))
-                lr = float(params.get("learning_rate", 0.1))
-                return GradientBoostingClassifier(n_estimators=n_est, learning_rate=lr, random_state=seed)
+                return GradientBoostingClassifier(
+                    n_estimators=p.get("n_estimators", 100),
+                    learning_rate=p.get("learning_rate", 0.1),
+                    max_depth=p.get("max_depth", 3),
+                    random_state=seed,
+                )
             if "svm" in m_id or "svc" in m_id:
-                c_val = float(params.get("C", 1.0))
-                return SVC(C=c_val, probability=True, random_state=seed)
-            return RandomForestClassifier(n_estimators=100, random_state=seed)
+                return SVC(
+                    C=p.get("C", 1.0), kernel=p.get("kernel", "rbf"),
+                    gamma=p.get("gamma", "scale"),
+                    probability=True, random_state=seed,
+                )
         else:
             if "random" in m_id or "rf" in m_id:
-                return RandomForestRegressor(n_estimators=100, random_state=seed)
+                return RandomForestRegressor(
+                    n_estimators=p.get("n_estimators", 100),
+                    max_depth=p.get("max_depth"),
+                    min_samples_split=p.get("min_samples_split", 2),
+                    random_state=seed,
+                )
             if "gradient" in m_id or "gb" in m_id:
-                return GradientBoostingRegressor(n_estimators=100, random_state=seed)
+                return GradientBoostingRegressor(
+                    n_estimators=p.get("n_estimators", 100),
+                    learning_rate=p.get("learning_rate", 0.1),
+                    max_depth=p.get("max_depth", 3),
+                    random_state=seed,
+                )
             if "ridge" in m_id:
-                alpha = float(params.get("alpha", 1.0))
-                return Ridge(alpha=alpha, random_state=seed)
-            if "svm" in m_id or "svr" in m_id:
-                return SVR()
-            return LinearRegression()
+                return Ridge(alpha=p.get("alpha", 1.0), random_state=seed)
+            if "svr" in m_id or "svm" in m_id:
+                return SVR(
+                    C=p.get("C", 1.0), kernel=p.get("kernel", "rbf"),
+                    gamma=p.get("gamma", "scale"),
+                )
+            if "linear" in m_id:
+                return LinearRegression(fit_intercept=p.get("fit_intercept", True))
+
+        raise ValueError(f"Unsupported model adapter: {model_id}")
 
 
 baseline_service = BaselineService()

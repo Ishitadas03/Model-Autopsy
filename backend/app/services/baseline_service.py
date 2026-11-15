@@ -90,7 +90,7 @@ class BaselineService:
         is_classification = task_type == "classification"
 
         if target_col not in df.columns:
-            target_col = df.columns[-1]
+            raise ValueError(f"Target column '{target_col}' does not exist in dataset '{request.dataset_id}'")
 
         y_raw = df[target_col]
         X_raw = df.drop(columns=[target_col])
@@ -99,6 +99,8 @@ class BaselineService:
         if len(feature_names) == 0:
             raise ValueError(f"Dataset has no feature columns after removing target column '{target_col}'")
 
+        if task_type not in ("classification", "regression"):
+            raise ValueError(f"Unsupported task type '{task_type}'")
         # 2. Preprocess feature columns
         numeric_cols = list(X_raw.select_dtypes(include=[np.number]).columns)
         categorical_cols = [c for c in feature_names if c not in numeric_cols]
@@ -248,10 +250,9 @@ class BaselineService:
                 df = pd.read_csv(p)
                 return df, target_col, task_type
 
-        # Fallback to Iris if synthetic demo
-        from sklearn.datasets import load_iris
-        raw_iris = load_iris(as_frame=True)
-        return raw_iris.frame, "target", "classification"
+        raise FileNotFoundError(
+            f"Dataset '{dataset_id}' was not found in object storage or allowed local paths"
+        )
 
     def _instantiate_model(
         self, model_id: str, is_classification: bool, seed: int, params: Dict[str, Any]

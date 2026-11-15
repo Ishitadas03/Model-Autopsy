@@ -74,6 +74,7 @@ async def get_experiment(
             detail=f"Experiment {experiment_id} not found",
         )
 
+    assert_experiment_access(experiment, user_id)
     return _experiment_to_detail(experiment)
 
 

@@ -120,7 +120,8 @@ class ExperimentService:
             )
 
 
-        task_type_enum = self._to_task_type(request.task_type)
+        resolved_task_type = request.task_type or dataset_record.task_type
+        task_type_enum = self._to_task_type(resolved_task_type)
         pert_enum = self._to_stress_type(pert_family)
         mode_enum = self._to_stress_mode(stress_mode)
 
@@ -159,7 +160,7 @@ class ExperimentService:
             "model_name": model_name,
             "dataset_name": dataset_name,
             "dataset_id": dataset_id,
-            "task_type": request.task_type or "classification",
+            "task_type": resolved_task_type,
             "perturbation_family": pert_family,
             "evaluation_metric": eval_metric,
             "failure_threshold": threshold,
@@ -268,8 +269,8 @@ class ExperimentService:
             return TaskType.CLASSIFICATION
         try:
             return TaskType(val.lower())
-        except (ValueError, AttributeError):
-            return TaskType.CLASSIFICATION
+        except (ValueError, AttributeError) as exc:
+            raise InvalidExperimentConfigError(f"Invalid task type: {val}") from exc
 
     def _to_stress_type(self, val: Optional[str]) -> StressType:
         if not val:
@@ -287,8 +288,8 @@ class ExperimentService:
             return StressType.COVARIATE_SHIFT
         try:
             return StressType(v)
-        except (ValueError, AttributeError):
-            return StressType.GAUSSIAN_NOISE
+        except (ValueError, AttributeError) as exc:
+            raise InvalidExperimentConfigError(f"Unsupported stress type: {val}") from exc
 
     def _to_stress_mode(self, val: Optional[str]) -> StressMode:
         if not val:
@@ -318,7 +319,9 @@ class ExperimentService:
             "covariate_shift": "e006",
             "distribution_shift": "e006",
         }
-        return mapping.get(val, "e001")
+        if val not in mapping:
+            raise InvalidExperimentConfigError(f"Unsupported experiment protocol: {val}")
+        return mapping[val]
 
     def _generate_config_yaml(
         self,

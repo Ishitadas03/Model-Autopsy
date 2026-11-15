@@ -20,7 +20,7 @@ jobs:
     timeout-minutes: 20
     env:
       DATABASE_URL: sqlite+aiosqlite:///./ci_test.db
-      STORAGE_PROVIDER: local
+      STORAGE_PROVIDER: auto
       DEBUG: 'false'
     steps:
       - uses: actions/checkout@v4

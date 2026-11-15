@@ -37,6 +37,7 @@ from app.repositories.experiment import (
     ExperimentResultRepository,
 )
 from app.repositories.dataset import DatasetRepository
+from app.core.auth import can_read_dataset
 from app.repositories.failure_sample import FailureSampleRepository
 from app.repositories.artifact import ArtifactRepository, ArtifactReferenceRepository
 from app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
@@ -59,7 +60,7 @@ class ExperimentService:
         self.fail_repo = FailureSampleRepository(session)
         self.artifact_repo = ArtifactRepository(session)
 
-    async def create_experiment(self, request: ExperimentRunRequest) -> Experiment:
+    async def create_experiment(self, request: ExperimentRunRequest, owner_id: Optional[uuid.UUID] = None) -> Experiment:
         """Create and queue a new experiment."""
         # 1. Validate metric polarity and task compatibility
         self._validate_metric_polarity(request)
@@ -94,8 +95,8 @@ class ExperimentService:
         if request.stress_config is not None:
             pert_family = request.stress_config.type.value
         dataset_record = await DatasetRepository(self.session).get_by_dataset_id(dataset_id)
-        if dataset_record is None:
-            raise InvalidExperimentConfigError(f"Unknown dataset: {dataset_id}")
+        if not can_read_dataset(dataset_record, owner_id):
+            raise InvalidExperimentConfigError("Dataset unavailable or access denied")
         target_name = request.target_name or dataset_record.target_name
         if not target_name:
             raise InvalidExperimentConfigError("Dataset target column is missing")
@@ -116,6 +117,7 @@ class ExperimentService:
         # Generate config YAML
         config_yaml = self._generate_config_yaml(
             experiment_id=experiment_id,
+            owner_id=owner_id,
             model_name=model_name,
             dataset_name=dataset_name,
             dataset_id=dataset_id,

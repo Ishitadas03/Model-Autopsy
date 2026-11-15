@@ -55,6 +55,7 @@ class StressMode(str, enum.Enum):
     """Execution mode for stress testing."""
     INCREMENTAL = "incremental"
     RANDOM = "random"
+    FEATURE_SPECIFIC = "feature_specific"
     ADAPTIVE = "adaptive"
 
 

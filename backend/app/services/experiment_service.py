@@ -72,9 +72,11 @@ class ExperimentService:
                 raise ConcurrencyLimitError(settings.MAX_CONCURRENT_EXPERIMENTS)
 
         # 3. Generate human-readable experiment ID (e.g., EXP-0001)
-        experiment_id = await self.exp_repo.get_next_experiment_id()
+        experiment_id = f"EXP-{uuid.uuid4().hex[:12].upper()}"
 
         # 4. Extract parameters supporting both snake_case and camelCase
+        if settings.APP_ENV == "production" and not (request.model_name or request.model_id):
+            raise InvalidExperimentConfigError("An explicit model selection is required")
         model_name = request.model_name or request.model_id or "RandomForest-v2 (Credit)"
         dataset_name = request.dataset_name or request.dataset_id
         dataset_id = request.dataset_id
@@ -89,8 +91,13 @@ class ExperimentService:
             list(request.stress_config.severity_levels) if request.stress_config
             else list(request.severity_levels or [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3])
         )
-        if any(level < 0 or level > 1 for level in severity_levels):
-            raise InvalidExperimentConfigError("Severity levels must be in [0, 1]")
+        if (not severity_levels or any(
+            not isinstance(level, (int, float))
+            or not __import__("math").isfinite(level)
+            or level < 0 or level > 1
+            for level in severity_levels
+        )):
+            raise InvalidExperimentConfigError("Severity levels must be finite numbers in [0, 1]")
         if request.num_seeds is not None and request.seeds is None:
             seeds = [seed + i for i in range(request.num_seeds)]
         if request.stress_config is not None:
@@ -101,6 +108,10 @@ class ExperimentService:
         target_name = request.target_name or dataset_record.target_name
         if not target_name:
             raise InvalidExperimentConfigError("Dataset target column is missing")
+        if target_name != dataset_record.target_name:
+            raise InvalidExperimentConfigError("Target must match the registered dataset target")
+        if request.stress_mode in ("structured", "adaptive"):
+            raise InvalidExperimentConfigError("This stress mode is not supported by the generic runner")
         if request.task_type and str(request.task_type) not in (
             dataset_record.task_type, f"TaskType.{dataset_record.task_type.upper()}"
         ):
@@ -231,12 +242,15 @@ class ExperimentService:
             )
 
         # Verify failure threshold boundaries
-        if metric in higher_better and request.failure_threshold is not None:
+        if metric in higher_better - {"r2"} and request.failure_threshold is not None:
             if request.failure_threshold < 0.0 or request.failure_threshold > 1.0:
                 raise InvalidExperimentConfigError(
                     f"Failure threshold for higher-is-better metric '{metric}' must be between 0.0 and 1.0."
                 )
 
+        if metric == "r2" and request.failure_threshold is not None:
+            if request.failure_threshold > 1.0:
+                raise InvalidExperimentConfigError("R² threshold cannot exceed 1.0")
         if metric in lower_better and request.failure_threshold is not None:
             if request.failure_threshold < 0.0:
                 raise InvalidExperimentConfigError(

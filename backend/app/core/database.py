@@ -3,6 +3,7 @@
 from contextlib import asynccontextmanager
 from typing import AsyncGenerator
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import (
     AsyncEngine,
     AsyncSession,
@@ -76,6 +77,18 @@ async def init_db() -> None:
         failure_sample,
         artifact,
     )
+
+    if settings.APP_ENV == "production":
+        # Never silently generate or mutate production schemas. Migrate with Alembic.
+        async with engine.connect() as conn:
+            version = (await conn.execute(text(
+                "SELECT version_num FROM alembic_version"
+            ))).scalar_one_or_none()
+            if version != "003_durable_jobs":
+                raise RuntimeError(
+                    "Database migration required: apply Alembic revision 003_durable_jobs"
+                )
+        return
 
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)

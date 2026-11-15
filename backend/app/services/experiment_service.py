@@ -82,7 +82,19 @@ class ExperimentService:
         seed = int(request.seed if request.seed is not None else 42)
         seeds = request.seeds or settings.DEFAULT_SEEDS
         stress_mode = request.stress_mode or "incremental"
-        severity_levels = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+        severity_levels = (
+            list(request.stress_config.severity_levels) if request.stress_config
+            else list(request.severity_levels or [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3])
+        )
+        if any(level < 0 or level > 1 for level in severity_levels):
+            raise InvalidExperimentConfigError("Severity levels must be in [0, 1]")
+        if request.num_seeds is not None and request.seeds is None:
+            seeds = [seed + i for i in range(request.num_seeds)]
+        if request.stress_config is not None:
+            pert_family = request.stress_config.type.value
+        if not request.target_name:
+            raise InvalidExperimentConfigError("An explicit target column is required")
+
 
         task_type_enum = self._to_task_type(request.task_type)
         pert_enum = self._to_stress_type(pert_family)
@@ -154,6 +166,10 @@ class ExperimentService:
             "stress_mode": stress_mode,
             "severity_levels": severity_levels,
             "target_features": target_features,
+            "target_column": request.target_name,
+            "hyperparameters": dict(request.model_params),
+            "model_type": request.model_id,
+            "test_size": request.test_size,
             "seeds": seeds,
         }
 

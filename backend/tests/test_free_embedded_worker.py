@@ -68,3 +68,18 @@ def test_embedded_budget_defaults_are_safe():
     assert settings.EMBEDDED_MAX_ACTIVE_JOBS_PER_USER >= 1
     assert settings.EMBEDDED_MAX_CSV_ROWS <= 5000
     assert settings.EMBEDDED_MAX_CSV_BYTES <= 3 * 1024 * 1024
+
+
+@pytest.mark.asyncio
+async def test_readiness_reports_missing_embedded_worker(monkeypatch):
+    import json
+    from starlette.requests import Request
+    from app.api.v1.endpoints.health import readiness
+
+    monkeypatch.setattr(settings, "JOB_EXECUTION_MODE", "embedded")
+    monkeypatch.setattr(settings, "APP_ENV", "test")
+    web = create_app()
+    response = await readiness(Request({"type": "http", "app": web}))
+    payload = json.loads(response.body)
+    assert response.status_code == 503
+    assert payload["checks"]["worker"] is False

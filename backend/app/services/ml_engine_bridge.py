@@ -93,6 +93,7 @@ class MLEngineBridge:
                     "id": request_data.get("dataset_id", "iris"),
                     "path": request_data.get("dataset_path"),
                     "target_column": request_data.get("target_column") or request_data.get("target_name"),
+                    "test_size": request_data.get("test_size", 0.20),
                 },
                 "stress_test": {
                     "perturbation_family": request_data.get("perturbation_family", "gaussian_noise"),

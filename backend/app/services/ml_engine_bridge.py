@@ -362,6 +362,15 @@ class MLEngineBridge:
         baseline_accuracy = measured(target_data.get("baseline_accuracy"))
         if baseline_accuracy is None:
             baseline_accuracy = measured(baseline_metrics.get("accuracy"))
+        if baseline_f1 is None and isinstance(target_data.get("per_seed_results"), dict):
+            per_seed_values = [
+                measured(value.get("baseline_macro_f1"))
+                for value in target_data["per_seed_results"].values()
+                if isinstance(value, dict)
+            ]
+            available = [v for v in per_seed_values if v is not None]
+            if available:
+                baseline_f1 = sum(available) / len(available)
 
         raw_curve = target_data.get("severity_aggregates")
         if raw_curve is None:
@@ -391,8 +400,20 @@ class MLEngineBridge:
                 "threshold": request_data.get("failure_threshold"),
             })
 
+        # Aggregated experiments may only provide the actual zero-severity evaluation.
+        # Derive the baseline from that measured point, never from a fabricated constant.
+        if baseline_f1 is None:
+            zero = next((p for p in curve_data if p["severity"] == 0.0 and p["f1"] is not None), None)
+            if zero is not None:
+                baseline_f1 = zero["f1"]
+        if baseline_accuracy is None:
+            zero = next((p for p in curve_data if p["severity"] == 0.0 and p["accuracy"] is not None), None)
+            if zero is not None:
+                baseline_accuracy = zero["accuracy"]
         if baseline_f1 is None and baseline_accuracy is None:
             raise ValueError("Experiment has no measured baseline; refusing synthetic metrics")
+        for point in curve_data:
+            point["baseline"] = baseline_f1
 
         feature_vulns = target_data.get("feature_vulnerabilities") or []
         failed_samples = target_data.get("failed_samples") or []
@@ -417,7 +438,10 @@ class MLEngineBridge:
             worst_severity = worst_point["severity"]
 
         observed_boundary = target_data.get(
-            "observed_boundary", target_data.get("observed_failure_boundary")
+            "observed_boundary",
+            target_data.get(
+                "observed_failure_boundary", target_data.get("mean_observed_boundary")
+            ),
         )
 
         return {

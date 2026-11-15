@@ -6,7 +6,7 @@ services:
     region: oregon
     buildCommand: "pip install --upgrade pip && pip install -r backend/requirements-prod.txt"
     startCommand: "uvicorn backend.app.main:app --host 0.0.0.0 --port $PORT"
-    healthCheckPath: /health
+    healthCheckPath: /ready
     autoDeploy: true
     envVars:
       - key: PYTHON_VERSION
@@ -17,6 +17,16 @@ services:
         value: "0.1.0"
       - key: DEBUG
         value: "false"
+      - key: APP_ENV
+        value: "production"
+      - key: AUTH_REQUIRED
+        value: "true"
+      - key: SUPABASE_URL
+        sync: false
+      - key: JOB_EXECUTION_MODE
+        value: "worker"
+      - key: STORAGE_PROVIDER
+        value: "r2"
       - key: LOG_LEVEL
         value: "INFO"
       - key: DATABASE_URL
@@ -28,9 +38,9 @@ services:
       - key: DATABASE_POOL_TIMEOUT
         value: "30"
       - key: CORS_ORIGINS
-        value: "http://localhost:3000"
+        value: "https://model-autopsy-ai.vercel.app,http://localhost:3000"
       - key: CORS_ORIGIN_REGEX
-        value: "^https://.*\\.vercel\\.app$"
+        value: ""
       - key: MAX_CONCURRENT_EXPERIMENTS
         value: "1"
       - key: EXPERIMENT_TIMEOUT_SECONDS

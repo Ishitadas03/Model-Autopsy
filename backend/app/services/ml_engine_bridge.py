@@ -302,177 +302,158 @@ class MLEngineBridge:
     def _parse_results(
         self, output_dir: Path, seeds: List[int], request_data: Dict[str, Any]
     ) -> Dict[str, Any]:
-        """Parse structured results from output directory."""
-        # Check for aggregate_results.json or aggregate_comparison.json or results.json
+        """Normalize measured experiment results; never substitute demo measurements."""
+        candidates = (
+            "aggregate_results.json",
+            "aggregate_comparison.json",
+            "results.json",
+            "failure_patterns_summary.json",
+            "metrics.json",
+        )
         data = None
-        for candidate in [
-            output_dir / "aggregate_results.json",
-            output_dir / "aggregate_comparison.json",
-            output_dir / "results.json",
-            output_dir / "failure_patterns_summary.json",
-            output_dir / "metrics.json",
-        ]:
-            if candidate.exists():
+        for filename in candidates:
+            path = output_dir / filename
+            if path.is_file():
                 try:
-                    with open(candidate, "r", encoding="utf-8") as f:
-                        data = json.load(f)
-                    break
-                except Exception:
-                    pass
+                    with path.open("r", encoding="utf-8") as handle:
+                        candidate = json.load(handle)
+                except (OSError, ValueError) as exc:
+                    raise ValueError(f"Invalid experiment results artifact {filename}: {exc}") from exc
+                if not isinstance(candidate, dict):
+                    raise ValueError(f"Experiment results artifact {filename} must be a JSON object")
+                data = candidate
+                break
+        if data is None:
+            raise ValueError(f"Experiment produced no readable results artifact in {output_dir}")
 
-        # If data loaded
-        baseline_f1 = 0.958
-        worst_case_f1 = 0.712
-        observed_boundary = None
+        target_data = data
+        if isinstance(data.get("models"), dict):
+            models = data["models"]
+            if len(models) != 1:
+                raise ValueError("Ambiguous multi-model results: explicit model selection required")
+            target_data = next(iter(models.values()))
+        if isinstance(target_data.get("corruptions"), dict):
+            corruptions = target_data["corruptions"]
+            if len(corruptions) != 1:
+                raise ValueError("Ambiguous multi-corruption results: explicit protocol selection required")
+            target_data = next(iter(corruptions.values()))
+        if not isinstance(target_data, dict):
+            raise ValueError("Experiment results have an invalid model/protocol structure")
+
+        def measured(value: Any) -> Optional[float]:
+            if isinstance(value, dict):
+                value = value.get("mean")
+            if value is None:
+                return None
+            try:
+                number = float(value)
+            except (TypeError, ValueError) as exc:
+                raise ValueError(f"Invalid numeric metric in experiment results: {value!r}") from exc
+            if not __import__("math").isfinite(number):
+                raise ValueError("Experiment results contain a non-finite metric")
+            return number
+
+        baseline_metrics = target_data.get("baseline_metrics") or {}
+        if not isinstance(baseline_metrics, dict):
+            raise ValueError("baseline_metrics must be an object")
+        baseline_f1 = measured(target_data.get("baseline_macro_f1"))
+        if baseline_f1 is None:
+            baseline_f1 = measured(baseline_metrics.get("macro_f1", baseline_metrics.get("f1")))
+        baseline_accuracy = measured(target_data.get("baseline_accuracy"))
+        if baseline_accuracy is None:
+            baseline_accuracy = measured(baseline_metrics.get("accuracy"))
+        if baseline_f1 is None and isinstance(target_data.get("per_seed_results"), dict):
+            per_seed_values = [
+                measured(value.get("baseline_macro_f1"))
+                for value in target_data["per_seed_results"].values()
+                if isinstance(value, dict)
+            ]
+            available = [v for v in per_seed_values if v is not None]
+            if available:
+                baseline_f1 = sum(available) / len(available)
+
+        raw_curve = target_data.get("severity_aggregates")
+        if raw_curve is None:
+            raw_curve = target_data.get("severity_results")
+        if raw_curve is None:
+            raw_curve = target_data.get("curve_data")
+        if not isinstance(raw_curve, list) or not raw_curve:
+            raise ValueError("Experiment has no measured severity curve; refusing synthetic results")
+
         curve_data = []
-        feature_vulns = []
-        failed_samples = []
-        failed_samples_count = 0
-        stats = None
+        for point in raw_curve:
+            if not isinstance(point, dict):
+                raise ValueError("Severity curve contains an invalid point")
+            severity = measured(point.get("severity", point.get("noiseLevel")))
+            f1_score = measured(point.get("macro_f1", point.get("mean_macro_f1", point.get("f1"))))
+            accuracy = measured(point.get("accuracy", point.get("mean_accuracy")))
+            score = measured(point.get("score"))
+            if severity is None or (f1_score is None and accuracy is None and score is None):
+                raise ValueError("Severity curve point is missing measured severity or metric")
+            curve_data.append({
+                "noiseLevel": severity,
+                "severity": severity,
+                "score": score if score is not None else (f1_score if f1_score is not None else accuracy),
+                "f1": f1_score,
+                "accuracy": accuracy,
+                "baseline": baseline_f1,
+                "threshold": request_data.get("failure_threshold"),
+            })
 
-        if data:
-            target_data = data
-            if "models" in data and isinstance(data["models"], dict):
-                first_model = list(data["models"].values())[0]
-                if isinstance(first_model, dict) and "corruptions" in first_model and isinstance(first_model["corruptions"], dict):
-                    target_data = list(first_model["corruptions"].values())[0]
-            elif "corruptions" in data and isinstance(data["corruptions"], dict):
-                target_data = list(data["corruptions"].values())[0]
+        # Aggregated experiments may only provide the actual zero-severity evaluation.
+        # Derive the baseline from that measured point, never from a fabricated constant.
+        if baseline_f1 is None:
+            zero = next((p for p in curve_data if p["severity"] == 0.0 and p["f1"] is not None), None)
+            if zero is not None:
+                baseline_f1 = zero["f1"]
+        if baseline_accuracy is None:
+            zero = next((p for p in curve_data if p["severity"] == 0.0 and p["accuracy"] is not None), None)
+            if zero is not None:
+                baseline_accuracy = zero["accuracy"]
+        if baseline_f1 is None and baseline_accuracy is None:
+            raise ValueError("Experiment has no measured baseline; refusing synthetic metrics")
+        for point in curve_data:
+            point["baseline"] = baseline_f1
 
-            if "baseline_macro_f1" in target_data:
-                baseline_f1 = target_data.get("baseline_macro_f1")
-            elif "baseline_metrics" in target_data and isinstance(target_data["baseline_metrics"], dict):
-                baseline_f1 = target_data["baseline_metrics"].get("f1") or target_data["baseline_metrics"].get("macro_f1", 0.958)
-            elif "per_seed_results" in target_data and isinstance(target_data["per_seed_results"], dict):
-                for s_data in target_data["per_seed_results"].values():
-                    if isinstance(s_data, dict) and "baseline_macro_f1" in s_data:
-                        baseline_f1 = s_data["baseline_macro_f1"]
-                        break
+        feature_vulns = target_data.get("feature_vulnerabilities") or []
+        failed_samples = target_data.get("failed_samples") or []
+        if not isinstance(feature_vulns, list) or not isinstance(failed_samples, list):
+            raise ValueError("Feature vulnerabilities and failed samples must be arrays")
 
-            observed_boundary = target_data.get("observed_failure_boundary") or target_data.get("observed_boundary") or target_data.get("mean_observed_boundary")
-            if "feature_vulnerabilities" in target_data and isinstance(target_data["feature_vulnerabilities"], list):
-                feature_vulns = target_data["feature_vulnerabilities"]
+        worst_f1 = measured(target_data.get("worst_case_macro_f1"))
+        worst_accuracy = measured(target_data.get("worst_case_accuracy"))
+        if worst_f1 is None:
+            measured_f1 = [p["f1"] for p in curve_data if p["f1"] is not None]
+            worst_f1 = min(measured_f1) if measured_f1 else None
+        if worst_accuracy is None:
+            measured_accuracy = [p["accuracy"] for p in curve_data if p["accuracy"] is not None]
+            worst_accuracy = min(measured_accuracy) if measured_accuracy else None
 
-            # Parse severity aggregates into curve data
-            if "severity_aggregates" in target_data and isinstance(target_data["severity_aggregates"], list):
-                worst_case_val = baseline_f1
-                for agg in target_data["severity_aggregates"]:
-                    sev = agg.get("severity", 0.0)
-                    f1_mean = agg.get("macro_f1", {}).get("mean", 0.0) if isinstance(agg.get("macro_f1"), dict) else agg.get("macro_f1", 0.0)
-                    acc_mean = agg.get("accuracy", {}).get("mean", 0.0) if isinstance(agg.get("accuracy"), dict) else agg.get("accuracy", 0.0)
-                    worst_case_val = f1_mean
-                    curve_data.append({
-                        "noiseLevel": sev,
-                        "severity": sev,
-                        "score": f1_mean,
-                        "f1": f1_mean,
-                        "accuracy": acc_mean,
-                        "baseline": baseline_f1,
-                        "threshold": request_data.get("failure_threshold", 0.8),
-                    })
-                worst_case_f1 = worst_case_val
+        worst_severity = measured(target_data.get("worst_case_severity"))
+        if worst_severity is None and any(p["f1"] is not None for p in curve_data):
+            worst_point = min(
+                (p for p in curve_data if p["f1"] is not None),
+                key=lambda p: p["f1"],
+            )
+            worst_severity = worst_point["severity"]
 
-            elif "severity_results" in target_data and isinstance(target_data["severity_results"], list):
-                for item in target_data["severity_results"]:
-                    sev = item.get("severity", 0.0)
-                    f1_val = item.get("macro_f1", 0.0)
-                    acc_val = item.get("accuracy", 0.0)
-                    curve_data.append({
-                        "noiseLevel": sev,
-                        "severity": sev,
-                        "score": f1_val,
-                        "f1": f1_val,
-                        "accuracy": acc_val,
-                        "baseline": baseline_f1,
-                        "threshold": request_data.get("failure_threshold", 0.8),
-                    })
-                if curve_data:
-                    worst_case_f1 = curve_data[-1]["score"]
-
-        # If curve data is empty, populate reasonable default curve data
-        if not curve_data:
-            severities = request_data.get("severity_levels", [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3])
-            thresh = request_data.get("failure_threshold", 0.8)
-            for i, s in enumerate(severities):
-                score = round(max(0.60, baseline_f1 - (s * 0.8)), 3)
-                curve_data.append({
-                    "noiseLevel": s,
-                    "severity": s,
-                    "score": score,
-                    "f1": score,
-                    "accuracy": score,
-                    "baseline": baseline_f1,
-                    "threshold": thresh,
-                })
-            worst_case_f1 = curve_data[-1]["score"]
-
-        # Feature vulnerabilities
-        feature_vulns = [
-            {
-                "feature": "petal_width",
-                "drop": 0.284,
-                "relativeChangePercent": 28.4,
-                "rank": 1,
-                "caveat": "Empirical sensitivity — not a causal explanation.",
-            },
-            {
-                "feature": "petal_length",
-                "drop": 0.192,
-                "relativeChangePercent": 19.2,
-                "rank": 2,
-                "caveat": "Empirical sensitivity — not a causal explanation.",
-            },
-            {
-                "feature": "sepal_length",
-                "drop": 0.115,
-                "relativeChangePercent": 11.5,
-                "rank": 3,
-                "caveat": "Empirical sensitivity — not a causal explanation.",
-            },
-            {
-                "feature": "sepal_width",
-                "drop": 0.083,
-                "relativeChangePercent": 8.3,
-                "rank": 4,
-                "caveat": "Empirical sensitivity — not a causal explanation.",
-            },
-        ]
-
-        # Multi-seed stats
-        stats = {
-            "numSeeds": len(seeds),
-            "mean": worst_case_f1,
-            "std": 0.024,
-            "ci95": 0.021,
-        }
-
-        # Failed samples
-        failed_samples = [
-            {
-                "sample_id": f"samp-{idx + 100}",
-                "sample_index": idx + 10,
-                "true_label": "versicolor",
-                "predicted_label": "virginica",
-                "confidence": 0.84,
-                "noise_level": 0.20,
-                "seed": seeds[0] if seeds else 42,
-                "features_clean": {"sepal_length": 5.8, "sepal_width": 2.7, "petal_length": 5.1, "petal_width": 1.9},
-                "features_stressed": {"sepal_length": 6.1, "sepal_width": 2.5, "petal_length": 5.4, "petal_width": 2.1},
-                "feature_diffs": {"sepal_length": 0.3, "sepal_width": -0.2, "petal_length": 0.3, "petal_width": 0.2},
-            }
-            for idx in range(15)
-        ]
+        observed_boundary = target_data.get(
+            "observed_boundary",
+            target_data.get(
+                "observed_failure_boundary", target_data.get("mean_observed_boundary")
+            ),
+        )
 
         return {
             "baseline_macro_f1": baseline_f1,
-            "baseline_accuracy": baseline_f1,
-            "worst_case_macro_f1": worst_case_f1,
-            "worst_case_accuracy": worst_case_f1,
-            "worst_case_severity": 0.3,
-            "observed_boundary": observed_boundary or 0.231,
+            "baseline_accuracy": baseline_accuracy,
+            "worst_case_macro_f1": worst_f1,
+            "worst_case_accuracy": worst_accuracy,
+            "worst_case_severity": worst_severity,
+            "observed_boundary": observed_boundary,
             "curve_data": curve_data,
             "feature_vulnerabilities": feature_vulns,
-            "statistical_validation": stats,
+            "statistical_validation": target_data.get("statistical_validation"),
             "failed_samples_count": len(failed_samples),
             "failed_samples": failed_samples,
         }

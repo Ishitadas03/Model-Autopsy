@@ -256,6 +256,19 @@ def main() -> int:
     if task_type not in ("classification", "regression"):
         raise ValueError(f"Unsupported task type: {task_type}")
     is_classification = task_type == "classification"
+    supported_metrics = (
+        {"f1", "accuracy", "precision", "recall"}
+        if is_classification else {"r2", "mae", "rmse"}
+    )
+    if metric_name not in supported_metrics:
+        raise ValueError(
+            f"Metric {metric_name!r} is incompatible with {task_type}; "
+            f"choose from {sorted(supported_metrics)}"
+        )
+    if not np.isfinite(failure_threshold):
+        raise ValueError("Failure threshold must be finite")
+    if metric_name in {"f1", "accuracy", "precision", "recall"} and not (0 <= failure_threshold <= 1):
+        raise ValueError("Classification metric threshold must be in [0, 1]")
 
     if target_col not in df.columns:
         raise ValueError(f"Target column {target_col!r} not found in dataset")
@@ -311,8 +324,8 @@ def main() -> int:
             base_f1s.append(b_f1)
             base_accs.append(b_acc)
         else:
-            b_f1 = float(r2_score(y_test, base_preds))
-            b_acc = float(mean_absolute_error(y_test, base_preds))
+            b_f1 = float(r2_score(y_test, base_preds))  # R2; never serialize as F1
+            b_acc = float(mean_absolute_error(y_test, base_preds))  # MAE
             base_f1s.append(b_f1)
             base_accs.append(b_acc)
 
@@ -344,27 +357,28 @@ def main() -> int:
                 m_acc = float(accuracy_score(y_test, preds))
                 m_prec = float(precision_score(y_test, preds, average="macro", zero_division=0))
                 m_rec = float(recall_score(y_test, preds, average="macro", zero_division=0))
-                cm = confusion_matrix(y_test, preds).tolist()
-                eval_metric_val = m_f1 if "f1" in metric_name else m_acc
-                is_failed = eval_metric_val < failure_threshold
+                metric_values = {
+                    "f1": m_f1, "accuracy": m_acc,
+                    "precision": m_prec, "recall": m_rec,
+                }
             else:
                 m_f1 = float(r2_score(y_test, preds))
                 m_acc = float(mean_absolute_error(y_test, preds))
-                m_prec = 0.0
-                m_rec = 0.0
-                cm = []
-                eval_metric_val = m_f1 if "r2" in metric_name else m_acc
-                is_failed = eval_metric_val < failure_threshold if "r2" in metric_name else eval_metric_val > failure_threshold
+                m_rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
+                metric_values = {"r2": m_f1, "mae": m_acc, "rmse": m_rmse}
+            eval_metric_val = metric_values[metric_name]
+            is_failed = (
+                eval_metric_val > failure_threshold
+                if metric_name in {"mae", "rmse"} else eval_metric_val < failure_threshold
+            )
 
             if is_failed and observed_bound is None:
                 observed_bound = sev
 
             record = {
                 "severity": sev,
-                "macro_f1": round(m_f1, 4),
-                "accuracy": round(m_acc, 4),
-                "precision": round(m_prec, 4),
-                "recall": round(m_rec, 4),
+                **{name: round(value, 6) for name, value in metric_values.items()},
+                "score": round(eval_metric_val, 6),
                 "is_failed": is_failed,
             }
             seed_records.append(record)

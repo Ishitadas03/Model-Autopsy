@@ -197,7 +197,7 @@ export const CorruptionAggregateResultSchema = z.object({
   n_successful_seeds: z.number(),
   n_failed_seeds: z.number(),
   failed_seed_details: z.array(z.any()).default([]),
-  per_seed_boundaries: z.record(z.number().nullable()).optional(),
+  per_seed_boundaries: z.record(z.string(), z.number().nullable()).optional(),
   severity_aggregates: z.array(SeverityAggregatePointSchema),
   mean_observed_boundary: z.number().nullable(),
   earliest_individual_boundary: z.number().nullable(),

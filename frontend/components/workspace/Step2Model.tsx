@@ -23,13 +23,17 @@ export function Step2Model({
   onSelectModel,
   onUpdateParams,
 }: Step2ModelProps) {
-  const [models, setModels] = useState<ModelAdapter[]>(MOCK_MODELS);
+  const mocksEnabled = process.env.NEXT_PUBLIC_USE_MOCKS === 'true';
+  const [models, setModels] = useState<ModelAdapter[]>(mocksEnabled ? MOCK_MODELS : []);
+  const [loading, setLoading] = useState(!mocksEnabled);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
 
   useEffect(() => {
     let mounted = true;
     api.getModels()
       .then((data) => {
-        if (!mounted || !Array.isArray(data) || data.length === 0) return;
+        if (!mounted) return;
+        if (!Array.isArray(data)) throw new Error('Invalid model catalog response');
 
         // Normalize backend models to conform to ModelAdapter schema
         const normalizedBackendModels: ModelAdapter[] = data.map((m: any) => {
@@ -54,23 +58,25 @@ export function Step2Model({
           };
         });
 
-        // Always keep the general workspace models available alongside backend models
-        const combined = [...MOCK_MODELS];
+        const combined = mocksEnabled ? [...MOCK_MODELS] : [];
         for (const bm of normalizedBackendModels) {
-          if (!combined.some((cm) => cm.id === bm.id)) {
-            combined.push(bm);
-          }
+          if (!combined.some((cm) => cm.id === bm.id)) combined.push(bm);
         }
         setModels(combined);
+        setCatalogError(null);
       })
       .catch(() => {
-        // Retain MOCK_MODELS on any fetch issue
-      });
+        if (mounted && !mocksEnabled) {
+          setModels([]);
+          setCatalogError('Unable to load the live model catalog. Retry when the backend is available.');
+        }
+      })
+      .finally(() => { if (mounted) setLoading(false); });
 
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [mocksEnabled]);
 
   // Filter models compatible with current dataset task type (case-insensitive)
   const normalizedTask = (taskType || 'classification').toLowerCase();
@@ -79,13 +85,12 @@ export function Step2Model({
     return m.taskTypes.some((t) => String(t).toLowerCase() === normalizedTask);
   });
 
-  const displayModels = compatibleModels.length > 0 ? compatibleModels : models;
+  const displayModels = compatibleModels;
 
   // Active selected model with safe fallback
   const selectedModel =
     displayModels.find((m) => m.id === selectedModelId) ||
-    displayModels[0] ||
-    MOCK_MODELS[0];
+    displayModels[0];
 
   // Auto-select first compatible model if current selected model is invalid or incompatible
   useEffect(() => {
@@ -109,10 +114,16 @@ export function Step2Model({
     <div className="space-y-6">
       {/* Fixed Mandated Honesty Callout */}
       <Callout type="info" title="Adapter-Only Architecture">
-        Model files cannot be uploaded. Only supported adapters are available. All selected
-        models are trained and evaluated in isolated environments under identical split and perturbation seeds.
+        Model files cannot be uploaded. Only registered adapters are available. Models are evaluated on reproducible holdout splits; probability estimates are not necessarily calibrated.
       </Callout>
 
+      {loading && <div role="status" className="text-sm text-text-muted">Loading supported models…</div>}
+      {catalogError && <div role="alert" className="rounded-lg border border-warning/30 p-3 text-sm text-warning">{catalogError}</div>}
+      {!loading && !catalogError && displayModels.length === 0 && (
+        <div role="status" className="rounded-lg border border-border p-3 text-sm text-text-muted">
+          No supported {taskType} models are available. Choose a registered adapter before running an experiment.
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {displayModels.map((model) => {
           const isSelected = selectedModel?.id === model.id;
@@ -169,7 +180,7 @@ export function Step2Model({
                 {model.predictProba ? (
                   <span className="text-[10px] font-cabin text-success flex items-center gap-1">
                     <ShieldCheck className="w-3 h-3" />
-                    Probabilities calibrated
+                    Probability estimates available
                   </span>
                 ) : (
                   <span className="text-[10px] font-cabin text-warning flex items-center gap-1">

@@ -112,12 +112,34 @@ class TestExperimentsCrud:
         assert response.status_code in (400, 422)
 
     @pytest.mark.asyncio
-    async def test_cancel_experiment(self, client: AsyncClient, seed_experiment):
-        """Test POST /api/experiments/{id}/cancel."""
+    async def test_cannot_cancel_completed_experiment(self, client: AsyncClient, seed_experiment):
+        """Completed scientific results must not be relabeled as cancelled."""
         response = await client.post("/api/experiments/EXP-0241/cancel")
-        assert response.status_code == 200
-        data = response.json()
-        assert data["success"] is True
+        assert response.status_code == 409
+        assert "cannot be cancelled" in response.json()["detail"].lower()
+
+    @pytest.mark.asyncio
+    async def test_cancel_queued_experiment(self, client: AsyncClient, seed_datasets, seed_models):
+        """Cancellation should work for jobs not yet claimed by a worker."""
+        request = {
+            "modelName": "RandomForest-v2 (Credit)",
+            "datasetName": "German Credit Benchmark",
+            "datasetId": "german-credit",
+            "taskType": "classification",
+            "perturbationFamily": "gaussian_noise",
+            "evaluationMetric": "f1",
+            "failureThreshold": 0.80,
+            "seed": 42,
+        }
+        created = await client.post("/api/experiments", json=request)
+        assert created.status_code == 201, created.text
+        exp_id = created.json()["id"]
+        cancelled = await client.post(f"/api/experiments/{exp_id}/cancel")
+        assert cancelled.status_code == 200, cancelled.text
+        assert cancelled.json()["status"] == "cancelled"
+        progress = await client.get(f"/api/experiments/{exp_id}/progress")
+        assert progress.status_code == 200
+        assert progress.json()["status"] == "cancelled"
 
     @pytest.mark.asyncio
     async def test_get_experiment_progress(self, client: AsyncClient, seed_experiment):

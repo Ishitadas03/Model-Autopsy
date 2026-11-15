@@ -92,6 +92,11 @@ class Settings(BaseSettings):
         description="Default seeds for multi-seed experiments",
     )
 
+    # Multi-tenant security: default fail-closed outside test mode.
+    APP_ENV: str = "production"
+    AUTH_REQUIRED: bool = True
+    SUPABASE_URL: Optional[str] = None
+
     # Security (optional, for future)
     API_KEY: Optional[str] = None
 

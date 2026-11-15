@@ -24,16 +24,11 @@ import { Tooltip } from '@/components/ui/Tooltip';
 const DRAFT_STORAGE_KEY = 'model_autopsy_workspace_draft';
 
 const DEFAULT_CONFIG: WorkspaceConfig = {
-  datasetId: 'credit-risk-demo',
-  datasetName: 'Credit Risk Demo (synthetic)',
-  taskType: 'classification',
-  modelId: 'random-forest-classifier',
-  modelName: 'Random Forest Classifier',
-  modelParams: {
-    n_estimators: 100,
-    max_depth: 10,
-    min_samples_split: 2,
-  },
+  datasetId: '',
+  datasetName: '',
+  modelId: '',
+  modelName: '',
+  modelParams: {},
   testSize: 0.2,
   seed: 42,
   numSeeds: 1,
@@ -168,14 +163,18 @@ function WorkspaceContent() {
                   <Step1Dataset
                     selectedDatasetId={config.datasetId}
                     onSelectDataset={(d: Dataset) => {
+                      setBaselineDone(false);
                       setConfig((prev) => ({
                         ...prev,
                         datasetId: d.id,
                         datasetName: d.name,
                         taskType: d.taskType,
-                        targetColumn: d.targetName || prev.targetColumn || 'target',
+                        targetColumn: d.targetName,
                         features: d.features,
-                        // Reset target features if dataset changes
+                        modelId: '',
+                        modelName: '',
+                        modelParams: {},
+                        metric: d.taskType === 'regression' ? 'r2' : 'f1',
                         targetFeatures: [],
                       }));
                     }}
@@ -188,6 +187,7 @@ function WorkspaceContent() {
                     selectedModelId={config.modelId}
                     selectedModelParams={config.modelParams}
                     onSelectModel={(m: ModelAdapter) => {
+                      setBaselineDone(false);
                       setConfig((prev) => ({
                         ...prev,
                         modelId: m.id,
@@ -196,6 +196,7 @@ function WorkspaceContent() {
                       }));
                     }}
                     onUpdateParams={(params) => {
+                      setBaselineDone(false);
                       setConfig((prev) => ({ ...prev, modelParams: params }));
                     }}
                   />
@@ -211,6 +212,7 @@ function WorkspaceContent() {
                     testSize={config.testSize}
                     seed={config.seed}
                     onUpdateSplit={(testSize, seed) => {
+                      setBaselineDone(false);
                       setConfig((prev) => ({ ...prev, testSize, seed }));
                     }}
                     baselineCompleted={baselineDone}

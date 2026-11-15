@@ -84,6 +84,11 @@ class Settings(BaseSettings):
         description="Base directory for experiment runner scripts",
     )
 
+    # Durable background ML execution (worker is a separate service).
+    JOB_EXECUTION_MODE: str = "worker"
+    WORKER_POLL_SECONDS: int = 3
+    WORKER_LEASE_SECONDS: int = 90
+
     # Experiment execution
     MAX_CONCURRENT_EXPERIMENTS: int = 2
     EXPERIMENT_TIMEOUT_SECONDS: int = 3600  # 1 hour default

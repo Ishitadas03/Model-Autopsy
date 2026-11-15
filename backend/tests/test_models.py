@@ -35,9 +35,11 @@ class TestModelEndpoints:
 
         data = response.json()
         assert isinstance(data, list)
-        # Should only return iris models
+        # Dataset-specific adapters may be returned alongside generic adapters
+        # that support all uploaded or benchmark datasets.
         for model in data:
-            assert "iris" in model["supportedDatasets"]
+            supported = model["supportedDatasets"]
+            assert supported == [] or "iris" in supported
 
     @pytest.mark.asyncio
     async def test_get_model(self, client: AsyncClient, seed_models):
@@ -56,3 +58,24 @@ class TestModelEndpoints:
         """Test GET /api/models/{model_id} returns 404 for unknown model."""
         response = await client.get("/api/models/nonexistent")
         assert response.status_code == 404
+
+    @pytest.mark.asyncio
+    async def test_generic_models_support_classification_and_regression(self, client: AsyncClient):
+        """The live API catalog must support custom regression CSVs without UI mocks."""
+        response = await client.get("/api/models")
+        assert response.status_code == 200, response.text
+        rows = response.json()
+        generic = [row for row in rows if row["id"].startswith("generic-")]
+        assert any(row["taskType"] == "classification" for row in generic)
+        assert any(row["taskType"] == "regression" for row in generic)
+        assert all(row["framework"] == "scikit-learn" for row in generic)
+        assert all(row["supportedDatasets"] == [] for row in generic)
+
+    @pytest.mark.asyncio
+    async def test_generic_model_lookup(self, client: AsyncClient):
+        response = await client.get("/api/models/generic-rf-regressor")
+        assert response.status_code == 200, response.text
+        row = response.json()
+        assert row["taskType"] == "regression"
+        assert row["predictProba"] is False
+        assert row["parameters"]["n_estimators"] == 100

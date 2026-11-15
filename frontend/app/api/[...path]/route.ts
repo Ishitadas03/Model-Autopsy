@@ -6,12 +6,12 @@ export const dynamic = 'force-dynamic';
 
 const WRITE_METHODS = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
-async function proxy(request: NextRequest, context: { params: { path: string[] } }) {
+async function proxy(request: NextRequest, context: { params: Promise<{ path: string[] }> }) {
   const method = request.method;
   if (WRITE_METHODS.has(method) && !validSameOrigin(request)) {
     return NextResponse.json({ error: 'Forbidden origin' }, { status: 403 });
   }
-  const parts = context.params.path;
+  const parts = (await context.params).path;
   if (!Array.isArray(parts) || !parts.length || parts.some((part) => !/^[a-zA-Z0-9_.-]{1,160}$/.test(part) || part === '..')) {
     return NextResponse.json({ error: 'Invalid API path' }, { status: 400 });
   }

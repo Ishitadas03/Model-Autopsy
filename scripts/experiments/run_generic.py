@@ -542,29 +542,40 @@ def main() -> int:
     for i, fv in enumerate(feature_vulnerabilities):
         fv["rank"] = i + 1
 
-    # Write output files
-    # 1. curves.csv
+    # Persist measured metric names, not classification aliases for regression.
     curves_csv_path = output_dir / "curves.csv"
-    with open(curves_csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=[
-            "severity", "mean_macro_f1", "sem_macro_f1", "ci_lower", "ci_upper", "mean_accuracy", "sem_accuracy"
-        ])
+    with open(curves_csv_path, "w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=list(curve_data[0].keys()))
         writer.writeheader()
         writer.writerows(curve_data)
 
-    # 2. results.json & aggregate_results.json
+    if is_classification:
+        baseline_metrics.update({
+            "f1": round(float(np.mean(base_f1s)), 6),
+            "accuracy": round(float(np.mean(base_accs)), 6),
+        })
+    else:
+        baseline_metrics.update({
+            "r2": round(float(np.mean(base_f1s)), 6),
+            "mae": round(float(np.mean(base_accs)), 6),
+        })
+
     results_json_data = {
         "experiment_id": exp_name,
         "model_name": model_name,
         "dataset_name": config.get("experiment", {}).get("dataset", {}).get("name", "Custom Dataset"),
         "task_type": task_type,
         "stress_type": stress_type,
+        "metric": metric_name,
+        "metric_direction": "lower" if lower_is_better else "higher",
         "seeds": seeds,
-        "baseline_macro_f1": round(float(np.mean(base_f1s)), 4),
-        "baseline_accuracy": round(float(np.mean(base_accs)), 4),
-        "worst_case_macro_f1": round(float(np.min([agg["macro_f1"]["mean"] for agg in severity_aggregates])), 4),
-        "worst_case_accuracy": round(float(np.min([agg["accuracy"]["mean"] for agg in severity_aggregates])), 4),
-        "worst_case_severity": severities[-1],
+        "baseline_metrics": baseline_metrics,
+        "worst_case_metrics": worst_case_metrics,
+        "baseline_macro_f1": baseline_metrics.get("f1") if is_classification else None,
+        "baseline_accuracy": baseline_metrics.get("accuracy") if is_classification else None,
+        "worst_case_macro_f1": worst_case_metrics.get("f1") if is_classification else None,
+        "worst_case_accuracy": worst_case_metrics.get("accuracy") if is_classification else None,
+        "worst_case_severity": worst_case["severity"],
         "observed_boundary": overall_boundary,
         "observed_boundary_caveat": "Observed failure boundary under the specified experimental configuration.",
         "failure_threshold": failure_threshold,
@@ -582,30 +593,51 @@ def main() -> int:
     with open(agg_path, "w", encoding="utf-8") as f:
         json.dump(results_json_data, f, indent=2)
 
-    # 3. report.md
+    # 3. Research report with correct metric names and direction.
     report_path = output_dir / "report.md"
+    label = {"f1": "Macro-F1", "r2": "R²", "mae": "MAE", "rmse": "RMSE"}.get(
+        metric_name, metric_name.upper()
+    )
+    boundary_text = (
+        f"s* = {overall_boundary:.4f}" if overall_boundary is not None
+        else "Not observed within evaluated severity range"
+    )
     report_content = f"""# Model Autopsy Report — {exp_name}
 
-## Executive Summary
+## Experiment Summary
 - **Model:** {model_name}
-- **Task Type:** {task_type.title()}
-- **Stress Type:** {stress_type}
-- **Baseline Macro-F1:** {results_json_data['baseline_macro_f1']:.4f}
-- **Worst-Case Macro-F1:** {results_json_data['worst_case_macro_f1']:.4f}
-- **Observed Failure Boundary:** {f"s* = {overall_boundary:.2f}" if overall_boundary is not None else "Unobserved (s* > max)"}
+- **Task:** {task_type}
+- **Stress:** {stress_type}
+- **Evaluation metric:** {label} ({'lower' if lower_is_better else 'higher'} is better)
+- **Baseline {label}:** {baseline_primary:.6f}
+- **Worst-case {label}:** {primary_worst:.6f}
+- **Worst evaluated severity:** {worst_case['severity']:.4f}
+- **Observed failure boundary:** {boundary_text}
+- **Seeds:** {len(seeds)}
 - **Caveat:** Observed failure boundary under the specified experimental configuration.
 
 ## Empirical Feature Sensitivity
-| Rank | Feature | Performance Drop | Interpretation |
+| Rank | Feature | {label} degradation | Interpretation |
 | :--- | :--- | :--- | :--- |
 """
     for fv in feature_vulnerabilities[:5]:
-        report_content += f"| {fv['rank']} | `{fv['feature']}` | {fv['drop']:.4f} | Empirical sensitivity — not a causal explanation. |\n"
+        report_content += (
+            f"| {fv['rank']} | `{fv['feature']}` | {fv['drop']:.6f} | "
+            "Empirical sensitivity — not a causal explanation. |\n"
+        )
 
-    report_content += """\n## Severity Aggregates (Multi-Seed)\n| Severity | Macro-F1 (Mean ± SEM) | Accuracy (Mean) | Status |\n| :--- | :--- | :--- | :--- |\n"""
+    report_content += f"""
+## Severity Aggregates
+| Severity | Mean {label} | SEM | Status |
+| :--- | :--- | :--- | :--- |
+"""
     for agg in severity_aggregates:
+        score = agg["score"]
+        sem = f"{score['sem']:.6f}" if score["sem"] is not None else "N/A (one seed)"
         status_str = "FAILED" if agg["is_failed"] else "PASS"
-        report_content += f"| {agg['severity']:.2f} | {agg['macro_f1']['mean']:.4f} ± {agg['macro_f1']['sem']:.4f} | {agg['accuracy']['mean']:.4f} | {status_str} |\n"
+        report_content += (
+            f"| {agg['severity']:.4f} | {score['mean']:.6f} | {sem} | {status_str} |\n"
+        )
 
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_content)

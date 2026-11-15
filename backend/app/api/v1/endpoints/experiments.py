@@ -285,14 +285,23 @@ def _build_results(result, eval_metric: str = "f1", failure_threshold: float | N
     if not result:
         return None
 
-    baseline_val = float(result.baseline_macro_f1) if result.baseline_macro_f1 is not None else None
-    worst_val = float(result.worst_case_macro_f1) if result.worst_case_macro_f1 is not None else None
-
+    baseline_metrics = dict(result.baseline_metrics or {})
+    worst_metrics = dict(result.worst_case_metrics or {})
+    if result.baseline_macro_f1 is not None:
+        baseline_metrics.setdefault("f1", float(result.baseline_macro_f1))
+    if result.baseline_accuracy is not None:
+        baseline_metrics.setdefault("accuracy", float(result.baseline_accuracy))
+    if result.worst_case_macro_f1 is not None:
+        worst_metrics.setdefault("f1", float(result.worst_case_macro_f1))
+    if result.worst_case_accuracy is not None:
+        worst_metrics.setdefault("accuracy", float(result.worst_case_accuracy))
+    baseline_val = baseline_metrics.get(eval_metric)
+    worst_val = worst_metrics.get(eval_metric)
     return {
         "baselineScore": baseline_val,
         "worstCaseScore": worst_val,
-        "baselineMetrics": {eval_metric: baseline_val} if baseline_val is not None else {},
-        "worstCaseMetrics": {eval_metric: worst_val} if worst_val is not None else {},
+        "baselineMetrics": baseline_metrics,
+        "worstCaseMetrics": worst_metrics,
         "failureThreshold": float(failure_threshold) if failure_threshold is not None else None,
         "observedBoundary": result.observed_boundary,
         "observedBoundaryLabel": "Observed failure boundary under the specified experimental configuration.",

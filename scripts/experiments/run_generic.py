@@ -51,6 +51,8 @@ for p in [str(ML_ENGINE_SRC), str(BACKEND_DIR)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from app.services.preprocessing import prepare_holdout
+
 
 def compute_sha256(path: Path) -> str:
     """Compute sha256 of file."""
@@ -247,37 +249,7 @@ def main() -> int:
     if target_col not in df.columns:
         raise ValueError(f"Target column {target_col!r} not found in dataset")
 
-    y_raw = df[target_col]
-    X_raw = df.drop(columns=[target_col])
-    feature_names = list(X_raw.columns)
-
-    numeric_cols = list(X_raw.select_dtypes(include=[np.number]).columns)
-    categorical_cols = [c for c in feature_names if c not in numeric_cols]
-
-    X_processed = pd.DataFrame(index=X_raw.index)
-    if numeric_cols:
-        num_imp = SimpleImputer(strategy="median")
-        X_num = num_imp.fit_transform(X_raw[numeric_cols])
-        for i, col in enumerate(numeric_cols):
-            X_processed[col] = X_num[:, i]
-
-    if categorical_cols:
-        cat_imp = SimpleImputer(strategy="most_frequent")
-        X_cat = cat_imp.fit_transform(X_raw[categorical_cols])
-        for i, col in enumerate(categorical_cols):
-            le = LabelEncoder()
-            X_processed[col] = le.fit_transform(X_cat[:, i].astype(str))
-
-    if is_classification:
-        target_le = LabelEncoder()
-        y_vec = target_le.fit_transform(y_raw.astype(str))
-        classes = [str(c) for c in target_le.classes_]
-    else:
-        y_vec = pd.to_numeric(y_raw, errors="coerce").fillna(0.0).values.astype(np.float64)
-        classes = []
-
-    X_mat = X_processed.values.astype(np.float64)
-    target_feature_indices = [feature_names.index(f) for f in target_features if f in feature_names]
+    feature_names = list(df.drop(columns=[target_col]).columns)
 
     # Multi-seed loop
     per_seed_records: Dict[int, List[Dict[str, Any]]] = {}
@@ -294,14 +266,16 @@ def main() -> int:
         seed_dir = output_dir / f"seed_{seed}"
         seed_dir.mkdir(parents=True, exist_ok=True)
 
-        # Train/Test split
-        stratify = y_vec if is_classification and len(np.unique(y_vec)) > 1 and np.all(np.bincount(y_vec) >= 2) else None
-        split_size = float(config.get("dataset", {}).get("test_size", 0.20))
-        if not (0.05 <= split_size <= 0.50):
-            raise ValueError("Dataset test_size must be between 0.05 and 0.50")
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_mat, y_vec, test_size=split_size, random_state=seed, stratify=stratify
+        # Each seed gets an independent split with train-only fitted preprocessing.
+        X_train, X_test, y_train, y_test, classes, feature_names = prepare_holdout(
+            df, target_col, task_type,
+            test_size=float(config.get("dataset", {}).get("test_size", 0.20)),
+            seed=seed,
         )
+        target_feature_indices = [
+            feature_names.index(feature)
+            for feature in target_features if feature in feature_names
+        ]
 
         train_std = np.std(X_train, axis=0)
         train_std[train_std == 0.0] = 1.0

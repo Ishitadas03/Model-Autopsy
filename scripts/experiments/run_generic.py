@@ -67,7 +67,7 @@ def compute_sha256(path: Path) -> str:
 
 def load_dataset_from_config(config: Dict[str, Any]) -> Tuple[pd.DataFrame, str, str]:
     """Load dataframe from config path, storage, or benchmark."""
-    ds_cfg = config.get("dataset", {})
+    ds_cfg = config.get("experiment", {}).get("dataset", {})
     ds_id = str(ds_cfg.get("id", "")).strip().lower()
     ds_path = ds_cfg.get("path")
     target_name = ds_cfg.get("target_column") or ds_cfg.get("target_name")
@@ -228,6 +228,17 @@ def main() -> int:
     stress_type = stress_cfg.get("perturbation_family", "gaussian_noise")
     severities = stress_cfg.get("severity_levels", [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30])
     target_features = stress_cfg.get("target_features", [])
+    supported_stresses = {"gaussian_noise", "missingness", "outliers", "covariate_shift"}
+    if stress_type not in supported_stresses:
+        raise ValueError(
+            f"Stress protocol {stress_type!r} is not implemented by the generic runner; "
+            "refusing to substitute Gaussian noise."
+        )
+    if not isinstance(severities, list) or not severities or any(
+        not isinstance(v, (int, float)) or not np.isfinite(v) or v < 0 or v > 1
+        for v in severities
+    ):
+        raise ValueError("Severity grid must be a non-empty list of finite values in [0, 1]")
 
     eval_cfg = exp_cfg.get("evaluation", {})
     metric_name = (eval_cfg.get("metric") or "f1").lower()
@@ -250,6 +261,14 @@ def main() -> int:
         raise ValueError(f"Target column {target_col!r} not found in dataset")
 
     feature_names = list(df.drop(columns=[target_col]).columns)
+    missing_features = sorted(set(target_features) - set(feature_names))
+    if missing_features:
+        raise ValueError(f"Unknown stress features: {missing_features}")
+    numeric_features = set(df.drop(columns=[target_col]).select_dtypes(include=[np.number]).columns)
+    if target_features and set(target_features) - numeric_features:
+        raise ValueError("Selected stress features must be numeric")
+    if not numeric_features:
+        raise ValueError("Generic perturbations require at least one numeric feature")
 
     # Multi-seed loop
     per_seed_records: Dict[int, List[Dict[str, Any]]] = {}
@@ -269,13 +288,13 @@ def main() -> int:
         # Each seed gets an independent split with train-only fitted preprocessing.
         X_train, X_test, y_train, y_test, classes, feature_names = prepare_holdout(
             df, target_col, task_type,
-            test_size=float(config.get("dataset", {}).get("test_size", 0.20)),
+            test_size=float(config.get("experiment", {}).get("dataset", {}).get("test_size", 0.20)),
             seed=seed,
         )
-        target_feature_indices = [
-            feature_names.index(feature)
-            for feature in target_features if feature in feature_names
+        eligible_features = target_features or [
+            feature for feature in feature_names if feature in numeric_features
         ]
+        target_feature_indices = [feature_names.index(feature) for feature in eligible_features]
 
         train_std = np.std(X_train, axis=0)
         train_std[train_std == 0.0] = 1.0
@@ -452,7 +471,7 @@ def main() -> int:
     results_json_data = {
         "experiment_id": exp_name,
         "model_name": model_name,
-        "dataset_name": config.get("dataset", {}).get("name", "Custom Dataset"),
+        "dataset_name": config.get("experiment", {}).get("dataset", {}).get("name", "Custom Dataset"),
         "task_type": task_type,
         "stress_type": stress_type,
         "seeds": seeds,

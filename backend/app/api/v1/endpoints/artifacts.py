@@ -62,6 +62,7 @@ async def get_experiment_artifact(
     artifact_type: str,
     seed: Optional[int] = Query(None, description="Specific seed (null for aggregated)"),
     format: str = Query("json", description="Output format: json, csv, or markdown"),
+    user_id: Optional[UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Get experiment artifact by filename or artifact type."""

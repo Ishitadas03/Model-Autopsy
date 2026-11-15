@@ -24,11 +24,11 @@ jobs:
           cache-dependency-path: frontend/package-lock.json
       - name: Install supported security-patched Next.js, React 19, and Zod 4
         run: |
-          # Upgrade eslint first: eslint-config-next@16 requires eslint>=9.
-          npm install --prefix frontend --save-dev eslint@^9
-          # React 19 and React Three Fiber 9 need to resolve atomically.
-          npm install --prefix frontend --save-exact next@16.4.6 eslint-config-next@16.4.6 react@19.2.3 react-dom@19.2.3 zod@4.6.7 sharp@0.35.5 @react-three/fiber@9.5.0 @react-three/drei@10.7.4 framer-motion@12.23.24
-          npm install --prefix frontend --save-dev @types/react@^19 @types/react-dom@^19
+          # Update dependency ranges as one atomic manifest edit, rather than
+          # asking npm to reconcile incompatible React 18/19 lockfile peers.
+          node -e 'const fs=require("fs");const p="frontend/package.json";const x=JSON.parse(fs.readFileSync(p));Object.assign(x.dependencies,{"next":"16.4.6","react":"19.2.3","react-dom":"19.2.3","zod":"4.6.7","sharp":"0.35.5","@react-three/fiber":"9.5.0","@react-three/drei":"10.7.4","framer-motion":"12.23.24"});Object.assign(x.devDependencies,{"eslint":"^9.0.0","eslint-config-next":"16.4.6","@types/react":"^19.0.0","@types/react-dom":"^19.0.0"});fs.writeFileSync(p,JSON.stringify(x,null,2)+"\\n");'
+          rm -rf frontend/node_modules frontend/package-lock.json
+          npm install --prefix frontend
           npm --prefix frontend ls next eslint-config-next react react-dom zod --depth=0
           npm audit --prefix frontend --omit=dev --audit-level=high
       - name: Commit exact dependencies and lockfile to PR branch

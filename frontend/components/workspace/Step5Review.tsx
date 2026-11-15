@@ -65,6 +65,9 @@ export function Step5Review({ config }: Step5ReviewProps) {
         testSize: config.testSize,
         seed: config.seed,
         numSeeds: config.numSeeds,
+        targetName: config.targetColumn,
+        modelParams: config.modelParams ?? {},
+        severityLevels: config.severityLevels,
       });
 
       toast({
@@ -99,6 +102,9 @@ export function Step5Review({ config }: Step5ReviewProps) {
         testSize: config.testSize,
         seed: config.seed,
         numSeeds: config.numSeeds,
+        targetName: config.targetColumn,
+        modelParams: config.modelParams ?? {},
+        severityLevels: config.severityLevels,
       });
 
       toast({

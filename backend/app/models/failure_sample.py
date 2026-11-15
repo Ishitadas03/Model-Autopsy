@@ -38,7 +38,7 @@ class FailedSample(Base):
     sample_id: Mapped[str] = mapped_column(String(100), nullable=False)  # e.g., "samp-101"
     true_label: Mapped[str] = mapped_column(String(100), nullable=False)
     predicted_label: Mapped[str] = mapped_column(String(100), nullable=False)
-    confidence: Mapped[float] = mapped_column(Float, nullable=False)
+    confidence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     noise_level: Mapped[float] = mapped_column(Float, nullable=False)  # Severity level
     seed: Mapped[int] = mapped_column(Integer, nullable=False)
     features_clean: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)  # {feature: value}

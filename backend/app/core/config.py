@@ -46,7 +46,7 @@ class Settings(BaseSettings):
         description="Allowed CORS origins",
     )
     CORS_ORIGIN_REGEX: Optional[str] = Field(
-        default=r"^https://.*\.vercel\.app$",
+        default=None,
         description="Regex pattern for allowed dynamic origins (e.g. Vercel deployments)",
     )
 

@@ -209,6 +209,9 @@ class ExperimentRunRequest(SchemaBase):
         alias="severityLevels",
         description="Direct severity levels list.",
     )
+    target_name: Optional[str] = Field(default=None, alias="targetName")
+    model_params: Dict[str, Any] = Field(default_factory=dict, alias="modelParams")
+    num_seeds: Optional[int] = Field(default=None, alias="numSeeds", ge=1, le=20)
     title: Optional[str] = Field(
         default=None,
         description="Optional human-readable title for the experiment run.",

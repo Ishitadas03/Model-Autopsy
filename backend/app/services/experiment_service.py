@@ -554,7 +554,7 @@ class ExperimentService:
                 sample_id=s.get("sample_id", "samp-0"),
                 true_label=str(s.get("true_label", "")),
                 predicted_label=str(s.get("predicted_label", "")),
-                confidence=float(s.get("confidence", 0.0)),
+                confidence=(float(s["confidence"]) if s.get("confidence") is not None else None),
                 noise_level=float(s.get("noise_level", 0.0)),
                 seed=int(s.get("seed", 42)),
                 features_clean=s.get("features_clean", {}),

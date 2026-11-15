@@ -489,8 +489,11 @@ class ExperimentService:
                 except ImportError:
                     from backend.app.services.storage_service import storage_service
 
+                if not file_path_obj.exists():
+                    raise FileNotFoundError(f"Experiment artifact missing: {art['file_path']}")
                 if file_path_obj.exists():
-                    r2_key = f"experiments/{experiment.experiment_id}/{art['file_name']}"
+                    # Use the relative path including seed subdirectories to avoid collisions.
+                    r2_key = f"experiments/{art['file_path']}"
                     upload_res = storage_service.store_file(file_path_obj, r2_key, mime_type)
                     ref_repo = ArtifactReferenceRepository(session)
                     await ref_repo.create(
@@ -505,7 +508,14 @@ class ExperimentService:
                         },
                     )
             except Exception as e:
-                logger.warning(f"Storage replication error for {art.get('file_name')}: {e}")
+                logger.exception(
+                    "Required experiment artifact replication failed",
+                    experiment_id=experiment.experiment_id,
+                    artifact=art.get("file_name"),
+                )
+                raise RuntimeError(
+                    f"Experiment artifact persistence failed for {art.get('file_name')}"
+                ) from e
 
         # Store failed samples
         for s in failed_samples:

@@ -133,6 +133,35 @@ async def run_claimed_job(job: tuple[uuid.UUID, str, dict]) -> None:
                 exp.lease_expires_at = None
 
 
+
+async def serve_jobs(shutdown: asyncio.Event) -> None:
+    """Run the durable queue in a worker service or an embedded free web instance."""
+    if settings.WORKER_LEASE_SECONDS < 30:
+        raise RuntimeError("Worker lease must be at least 30 seconds")
+    logger.info(
+        "Started database-backed experiment job polling",
+        worker_id=WORKER_ID,
+        execution_mode=settings.JOB_EXECUTION_MODE,
+    )
+    while not shutdown.is_set():
+        try:
+            await mark_abandoned()
+            job = await claim_next_job()
+            if job:
+                await run_claimed_job(job)
+                continue
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("Worker poll/claim failed; will retry")
+        try:
+            await asyncio.wait_for(
+                shutdown.wait(),
+                timeout=max(1, settings.WORKER_POLL_SECONDS),
+            )
+        except asyncio.TimeoutError:
+            pass
+
 async def main() -> None:
     setup_logging()
     if settings.JOB_EXECUTION_MODE != "worker":
@@ -147,20 +176,7 @@ async def main() -> None:
         except NotImplementedError:
             pass
 
-    logger.info("Started durable experiment worker", worker_id=WORKER_ID)
-    while not shutdown.is_set():
-        try:
-            await mark_abandoned()
-            job = await claim_next_job()
-            if job:
-                await run_claimed_job(job)
-                continue
-        except Exception:
-            logger.exception("Worker poll/claim failed; will retry")
-        try:
-            await asyncio.wait_for(shutdown.wait(), timeout=max(1, settings.WORKER_POLL_SECONDS))
-        except asyncio.TimeoutError:
-            pass
+    await serve_jobs(shutdown)
 
 
 if __name__ == "__main__":

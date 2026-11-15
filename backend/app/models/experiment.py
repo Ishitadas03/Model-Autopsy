@@ -91,6 +91,10 @@ class Experiment(Base):
     severity_levels: Mapped[list] = mapped_column(JSON, nullable=False)  # List of severity values
     seeds: Mapped[list] = mapped_column(JSON, nullable=False)  # List of seeds for multi-seed
     config_yaml: Mapped[str] = mapped_column(Text, nullable=False)  # Full YAML config
+    execution_payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    lease_owner: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    lease_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[ExperimentStatus] = mapped_column(
         Enum(ExperimentStatus, native_enum=False), default=ExperimentStatus.QUEUED, nullable=False, index=True
     )

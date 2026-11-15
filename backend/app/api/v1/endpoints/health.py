@@ -43,9 +43,17 @@ async def health_check(request: Request, session: AsyncSession = Depends(get_ses
 
 
 @router.get("/ready", response_model=dict)
-async def readiness() -> JSONResponse:
-    """Deployment gate: only ready with migrated DB, auth config, and durable R2."""
-    checks = {"database": False, "authentication": False, "r2_storage": False}
+async def readiness(request: Request) -> JSONResponse:
+    """Deployment gate: migrated DB, authentication, durable R2 and embedded worker."""
+    checks = {
+        "database": False,
+        "authentication": False,
+        "r2_storage": False,
+        "worker": True,
+    }
+    if settings.JOB_EXECUTION_MODE == "embedded":
+        task = getattr(request.app.state, "embedded_worker_task", None)
+        checks["worker"] = task is not None and not task.done()
     try:
         from app.core.database import async_session_factory
         async with async_session_factory() as session:

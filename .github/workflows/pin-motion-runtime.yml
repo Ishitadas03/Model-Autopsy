@@ -1,0 +1,36 @@
+name: One-time compatible Motion runtime lockfile repair
+on:
+  push:
+    branches: [feat/production-security-jobs-science]
+    paths: ['.github/workflows/pin-motion-runtime.yml']
+
+permissions:
+  contents: write
+
+jobs:
+  pin-motion-runtime:
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: true
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Keep internal Framer Motion package interfaces compatible
+        run: |
+          npm install --prefix frontend --save-exact motion-dom@12.23.23 motion-utils@12.23.6
+          npm --prefix frontend ls framer-motion motion-dom motion-utils --all
+          npm audit --prefix frontend --omit=dev --audit-level=high
+      - name: Commit repaired package manifest and lockfile
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add frontend/package.json frontend/package-lock.json
+          if ! git diff --cached --quiet; then
+            git commit -m "fix(frontend): pin compatible Motion runtime versions"
+            git push origin HEAD:feat/production-security-jobs-science
+          fi

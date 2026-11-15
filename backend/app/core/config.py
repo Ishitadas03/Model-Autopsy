@@ -85,9 +85,16 @@ class Settings(BaseSettings):
     )
 
     # Durable background ML execution (worker is a separate service).
+    # worker: paid always-on service; embedded: Render Free web process;
+    # inline: test/dev only. Embedded is NOT an always-on production worker.
     JOB_EXECUTION_MODE: str = "worker"
     WORKER_POLL_SECONDS: int = 3
     WORKER_LEASE_SECONDS: int = 90
+    EMBEDDED_MAX_SEEDS: int = 2
+    EMBEDDED_MAX_SEVERITIES: int = 7
+    EMBEDDED_MAX_ACTIVE_JOBS_PER_USER: int = 2
+    EMBEDDED_MAX_CSV_BYTES: int = 3 * 1024 * 1024
+    EMBEDDED_MAX_CSV_ROWS: int = 5000
 
     # Experiment execution
     MAX_CONCURRENT_EXPERIMENTS: int = 2

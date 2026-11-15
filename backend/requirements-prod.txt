@@ -27,3 +27,6 @@ pyyaml>=6.0.1
 python-multipart==0.0.9
 httpx==0.27.0
 
+
+# Asymmetric Supabase Auth JWT signature validation
+PyJWT[crypto]>=2.9,<3

@@ -11,6 +11,43 @@ from app.schemas import ModelAdapterSchema
 
 router = APIRouter()
 
+# Real scikit-learn adapters supported by scripts/experiments/run_generic.py.
+# Generic choices work with custom datasets, unlike benchmark-specific DB rows.
+# They are adapter configurations, NOT trained or calibrated models.
+GENERIC_MODELS = (
+    {"id": "generic-rf-classifier", "name": "Random Forest Classifier", "taskType": "classification", "predictProba": True,
+     "description": "Random forest trained from scratch on the selected dataset.", "parameters": {"n_estimators": 100, "max_depth": 12}},
+    {"id": "generic-logistic-regression", "name": "Logistic Regression", "taskType": "classification", "predictProba": True,
+     "description": "Regularized logistic classifier.", "parameters": {"C": 1.0, "max_iter": 500}},
+    {"id": "generic-gradient-boosting-classifier", "name": "Gradient Boosting Classifier", "taskType": "classification", "predictProba": True,
+     "description": "Gradient boosted decision trees.", "parameters": {"n_estimators": 100, "learning_rate": 0.1}},
+    {"id": "generic-svc-classifier", "name": "Support Vector Classifier (SVC)", "taskType": "classification", "predictProba": True,
+     "description": "RBF support vector classifier with estimated probabilities.", "parameters": {"C": 1.0}},
+    {"id": "generic-rf-regressor", "name": "Random Forest Regressor", "taskType": "regression", "predictProba": False,
+     "description": "Random forest for continuous targets.", "parameters": {"n_estimators": 100, "max_depth": 12}},
+    {"id": "generic-ridge-regression", "name": "Ridge Regression", "taskType": "regression", "predictProba": False,
+     "description": "L2-regularized linear regression.", "parameters": {"alpha": 1.0}},
+    {"id": "generic-linear-regression", "name": "Linear Regression", "taskType": "regression", "predictProba": False,
+     "description": "Ordinary least squares regression.", "parameters": {}},
+    {"id": "generic-gradient-boosting-regressor", "name": "Gradient Boosting Regressor", "taskType": "regression", "predictProba": False,
+     "description": "Gradient boosted regression trees.", "parameters": {"n_estimators": 100, "learning_rate": 0.1}},
+)
+
+
+def _generic_schema(spec: dict) -> ModelAdapterSchema:
+    return ModelAdapterSchema(
+        id=spec["id"],
+        name=spec["name"],
+        description=spec["description"],
+        taskType=spec["taskType"],
+        taskTypes=[spec["taskType"]],
+        supportedDatasets=[],
+        framework="scikit-learn",
+        predictProba=spec["predictProba"],
+        parameters=spec["parameters"],
+    )
+
+
 
 @router.get("", response_model=List[ModelAdapterSchema])
 async def list_models(
@@ -20,15 +57,15 @@ async def list_models(
     """List supported pre-configured model adapters."""
     repo = ModelAdapterRepository(session)
 
-    # Seed default adapters if empty
-    await repo.seed_default_adapters()
-
+    # Catalog GET is read-only; benchmark seeds are populated by a separate setup step.
     if dataset_id:
         models = await repo.get_by_dataset(dataset_id)
     else:
         models = await repo.get_active()
 
-    return [_model_to_schema(m) for m in models]
+    catalog = [_model_to_schema(m) for m in models]
+    catalog.extend(_generic_schema(spec) for spec in GENERIC_MODELS)
+    return catalog
 
 
 @router.get("/{model_id}", response_model=ModelAdapterSchema)
@@ -37,6 +74,10 @@ async def get_model(
     session: AsyncSession = Depends(get_session),
 ) -> ModelAdapterSchema:
     """Get a specific model adapter by ID."""
+    for spec in GENERIC_MODELS:
+        if spec["id"] == model_id:
+            return _generic_schema(spec)
+
     repo = ModelAdapterRepository(session)
     model = await repo.get_by_model_id(model_id)
 

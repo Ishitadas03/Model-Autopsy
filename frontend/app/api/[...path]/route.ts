@@ -34,11 +34,11 @@ async function proxy(request: NextRequest, context: { params: { path: string[] }
   if (token) headers.set('Authorization', 'Bearer ' + token);
   const contentType = request.headers.get('content-type');
   if (contentType) headers.set('Content-Type', contentType);
-  let body: Buffer | undefined;
+  let body: ArrayBuffer | undefined;
   if (WRITE_METHODS.has(method)) {
     const raw = await request.arrayBuffer();
     if (raw.byteLength > 21 * 1024 * 1024) return NextResponse.json({ error: 'Payload too large' }, { status: 413 });
-    body = Buffer.from(raw);
+    body = raw;
   }
   const execute = (access?: string) => {
     if (access) headers.set('Authorization', 'Bearer ' + access);

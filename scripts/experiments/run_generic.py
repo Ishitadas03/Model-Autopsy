@@ -350,8 +350,10 @@ def main() -> int:
             }
             seed_records.append(record)
 
-            # Collect failed samples at higher severity
-            if sev >= 0.15 and len(all_failed_samples) < 50:
+            # Persist only observed classification errors, never fabricated confidence.
+            # Regression residuals need a separately defined sample-level tolerance.
+            if is_classification and sev >= 0.15 and len(all_failed_samples) < 50:
+                probabilities = model.predict_proba(X_stressed) if hasattr(model, "predict_proba") else None
                 diff_mask = preds != y_test
                 diff_indices = np.where(diff_mask)[0]
                 for idx in diff_indices[:5]:
@@ -360,7 +362,10 @@ def main() -> int:
                         "sample_id": f"samp-{seed}-{sev}-{idx}",
                         "true_label": str(classes[y_test[idx]]) if is_classification and classes else str(y_test[idx]),
                         "predicted_label": str(classes[preds[idx]]) if is_classification and classes else str(preds[idx]),
-                        "confidence": 0.85,
+                        "confidence": (
+                            float(probabilities[idx, int(np.where(model.classes_ == preds[idx])[0][0])])
+                            if probabilities is not None else None
+                        ),
                         "noise_level": float(sev),
                         "seed": seed,
                         "features_clean": {feature_names[j]: round(float(X_test[idx, j]), 4) for j in range(min(8, len(feature_names)))},

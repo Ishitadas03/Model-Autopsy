@@ -476,6 +476,8 @@ class ExperimentService:
         # Create or update ExperimentResult
         await result_repo.create(
             experiment_id=experiment_db_id,
+            baseline_metrics=results.get("baseline_metrics"),
+            worst_case_metrics=results.get("worst_case_metrics"),
             baseline_macro_f1=results.get("baseline_macro_f1"),
             baseline_accuracy=results.get("baseline_accuracy"),
             worst_case_macro_f1=results.get("worst_case_macro_f1"),

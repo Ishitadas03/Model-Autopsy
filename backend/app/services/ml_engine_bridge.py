@@ -182,43 +182,59 @@ class MLEngineBridge:
 
         self._running_processes[experiment_id] = proc
 
+        # Drain stderr concurrently. Otherwise stderr pipe backpressure can
+        # deadlock the child before stdout finishes. Retain only the final 16 KiB.
+        stderr_tail = bytearray()
+
+        async def drain_stderr() -> None:
+            while True:
+                chunk = await proc.stderr.read(4096)
+                if not chunk:
+                    break
+                stderr_tail.extend(chunk)
+                if len(stderr_tail) > 16384:
+                    del stderr_tail[:-16384]
+
+        stderr_task = asyncio.create_task(drain_stderr())
+
         try:
-            # Track progress
             async for line in proc.stdout:
                 line_str = line.decode("utf-8", errors="replace").strip()
                 if line_str:
                     progress_data = self._parse_progress_line(line_str)
                     if progress_data and progress_callback:
                         await progress_callback(progress_data)
-
             await proc.wait()
+            await stderr_task
 
             if proc.returncode != 0:
-                stderr_bytes = await proc.stderr.read()
-                stderr = stderr_bytes.decode("utf-8", errors="replace")
+                stderr = stderr_tail.decode("utf-8", errors="replace")
                 logger.error(
                     "Experiment subprocess failed",
                     experiment_id=experiment_id,
                     returncode=proc.returncode,
                     stderr=stderr,
                 )
-                raise RuntimeError(f"Experiment failed with return code {proc.returncode}: {stderr}")
+                raise RuntimeError(f"Experiment subprocess exited with code {proc.returncode}")
 
-            # Collect artifacts
             artifacts = self._collect_artifacts(experiment_id, output_dir, seeds)
-
-            # Parse results
             results = self._parse_results(output_dir, seeds, request_data)
-
             logger.info("Experiment completed", experiment_id=experiment_id)
-
             return {
                 "artifacts": artifacts,
                 "results": results,
                 "output_dir": str(output_dir),
             }
-
         finally:
+            if proc.returncode is None:
+                proc.kill()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=5)
+                except asyncio.TimeoutError:
+                    logger.error("Subprocess did not reap after kill", experiment_id=experiment_id)
+            if not stderr_task.done():
+                stderr_task.cancel()
+            await asyncio.gather(stderr_task, return_exceptions=True)
             self._running_processes.pop(experiment_id, None)
 
     def _parse_progress_line(self, line: str) -> Optional[ProgressData]:

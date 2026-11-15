@@ -113,16 +113,9 @@ def load_dataset_from_config(config: Dict[str, Any]) -> Tuple[pd.DataFrame, str,
     except Exception:
         pass
 
-    # 5. Fallback synthetic tabular dataset for unpersisted demo testing
-    np.random.seed(42)
-    n_samples = 200
-    n_features = 6
-    X_synth = np.random.randn(n_samples, n_features)
-    y_synth = (X_synth[:, 0] * 1.5 + X_synth[:, 1] * -1.0 + np.random.randn(n_samples) * 0.5 > 0).astype(int)
-    cols = [f"feature_{i+1}" for i in range(n_features)]
-    df_synth = pd.DataFrame(X_synth, columns=cols)
-    df_synth["target"] = y_synth
-    return df_synth, "target", task_type
+    raise FileNotFoundError(
+        f"Dataset '{ds_id}' is unavailable; refusing to evaluate synthetic replacement data"
+    )
 
 
 def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[str, Any]):
@@ -247,10 +240,12 @@ def main() -> int:
 
     # Load and preprocess dataset
     df, target_col, task_type = load_dataset_from_config(config)
+    if task_type not in ("classification", "regression"):
+        raise ValueError(f"Unsupported task type: {task_type}")
     is_classification = task_type == "classification"
 
     if target_col not in df.columns:
-        target_col = df.columns[-1]
+        raise ValueError(f"Target column {target_col!r} not found in dataset")
 
     y_raw = df[target_col]
     X_raw = df.drop(columns=[target_col])

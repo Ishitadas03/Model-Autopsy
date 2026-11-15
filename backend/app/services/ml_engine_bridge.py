@@ -373,6 +373,12 @@ class MLEngineBridge:
         baseline_metrics = target_data.get("baseline_metrics") or {}
         if not isinstance(baseline_metrics, dict):
             raise ValueError("baseline_metrics must be an object")
+        metric_name = str(target_data.get("metric") or request_data.get("evaluation_metric") or "f1").lower()
+        normalized_baseline = {
+            str(key): measured(value)
+            for key, value in baseline_metrics.items()
+            if measured(value) is not None
+        }
         baseline_f1 = measured(target_data.get("baseline_macro_f1"))
         if baseline_f1 is None:
             baseline_f1 = measured(baseline_metrics.get("macro_f1", baseline_metrics.get("f1")))
@@ -405,6 +411,8 @@ class MLEngineBridge:
             f1_score = measured(point.get("macro_f1", point.get("mean_macro_f1", point.get("f1"))))
             accuracy = measured(point.get("accuracy", point.get("mean_accuracy")))
             score = measured(point.get("score"))
+            if score is None and isinstance(point.get("metrics"), dict):
+                score = measured(point["metrics"].get(metric_name))
             if severity is None or (f1_score is None and accuracy is None and score is None):
                 raise ValueError("Severity curve point is missing measured severity or metric")
             curve_data.append({
@@ -427,10 +435,19 @@ class MLEngineBridge:
             zero = next((p for p in curve_data if p["severity"] == 0.0 and p["accuracy"] is not None), None)
             if zero is not None:
                 baseline_accuracy = zero["accuracy"]
-        if baseline_f1 is None and baseline_accuracy is None:
+        baseline_metric = normalized_baseline.get(metric_name)
+        if baseline_metric is None:
+            baseline_metric = baseline_f1 if metric_name == "f1" else baseline_accuracy
+        if baseline_f1 is None and baseline_accuracy is None and baseline_metric is None:
             raise ValueError("Experiment has no measured baseline; refusing synthetic metrics")
+        if baseline_metric is not None:
+            normalized_baseline.setdefault(metric_name, baseline_metric)
+        if baseline_f1 is not None:
+            normalized_baseline.setdefault("f1", baseline_f1)
+        if baseline_accuracy is not None:
+            normalized_baseline.setdefault("accuracy", baseline_accuracy)
         for point in curve_data:
-            point["baseline"] = baseline_f1
+            point["baseline"] = baseline_metric
 
         feature_vulns = target_data.get("feature_vulnerabilities") or []
         failed_samples = target_data.get("failed_samples") or []
@@ -461,7 +478,31 @@ class MLEngineBridge:
             ),
         )
 
+        raw_worst = target_data.get("worst_case_metrics") or {}
+        if not isinstance(raw_worst, dict):
+            raise ValueError("worst_case_metrics must be an object")
+        normalized_worst = {
+            str(key): measured(value)
+            for key, value in raw_worst.items()
+            if measured(value) is not None
+        }
+        if worst_f1 is not None:
+            normalized_worst.setdefault("f1", worst_f1)
+        if worst_accuracy is not None:
+            normalized_worst.setdefault("accuracy", worst_accuracy)
+        if metric_name not in normalized_worst:
+            values = [p for p in curve_data if p["score"] is not None]
+            if values:
+                lower_better = metric_name in {"mae", "rmse", "mse", "loss"}
+                extreme = max(values, key=lambda v: v["score"]) if lower_better else min(values, key=lambda v: v["score"])
+                normalized_worst[metric_name] = extreme["score"]
+                if worst_severity is None:
+                    worst_severity = extreme["severity"]
+
         return {
+            "metric": metric_name,
+            "baseline_metrics": normalized_baseline,
+            "worst_case_metrics": normalized_worst,
             "baseline_macro_f1": baseline_f1,
             "baseline_accuracy": baseline_accuracy,
             "worst_case_macro_f1": worst_f1,

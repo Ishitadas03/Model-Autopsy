@@ -12,11 +12,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
     from app.core.database import get_session
+    from app.core.auth import get_current_user, assert_dataset_access
+    from app.core.config import settings
     from app.repositories.dataset import DatasetRepository
     from app.schemas import DatasetSchema
     from app.services.storage_service import storage_service
 except ImportError:
     from backend.app.core.database import get_session
+    from backend.app.core.auth import get_current_user, assert_dataset_access
+    from backend.app.core.config import settings
     from backend.app.repositories.dataset import DatasetRepository
     from backend.app.schemas import DatasetSchema
     from backend.app.services.storage_service import storage_service
@@ -150,6 +154,7 @@ def validate_and_parse_csv(
 
 @router.get("", response_model=List[DatasetSchema])
 async def list_datasets(
+    user_id: Optional[uuid.UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> List[DatasetSchema]:
     """List available benchmark datasets registered in the system."""
@@ -158,7 +163,7 @@ async def list_datasets(
     # Seed default datasets if empty
     await repo.seed_default_datasets()
 
-    datasets = await repo.get_active()
+    datasets = await repo.get_active(owner_id=user_id)
     return [_dataset_to_schema(ds) for ds in datasets]
 
 
@@ -170,6 +175,7 @@ async def upload_dataset(
     description: Optional[str] = Form("", description="Description of dataset contents"),
     task_type: str = Form("classification", description="Task type: 'classification' or 'regression'"),
     target_name: Optional[str] = Form(None, description="Name of the target/label column (defaults to last column)"),
+    user_id: Optional[uuid.UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DatasetSchema:
     """Upload a new CSV dataset, validate schema, store in R2/local storage, and persist in Supabase."""
@@ -181,7 +187,7 @@ async def upload_dataset(
             detail="Only CSV files (.csv) are accepted for dataset upload.",
         )
 
-    content = await file.read()
+    content = await file.read(MAX_FILE_SIZE_BYTES + 1)
     if len(content) > MAX_FILE_SIZE_BYTES:
         raise HTTPException(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
@@ -210,6 +216,12 @@ async def upload_dataset(
         else:
             cleaned_id = f"dataset-{uuid.uuid4().hex[:8]}"
 
+    # Namespace user-supplied IDs to prevent cross-account collisions and guessing.
+    if user_id is not None:
+        cleaned_id = f"u-{user_id.hex[:12]}-{cleaned_id[:50]}-{uuid.uuid4().hex[:8]}"
+    if task_type not in ("classification", "regression"):
+        raise HTTPException(status_code=400, detail="Invalid supervised learning task type")
+
     # Check for duplicate ID in Supabase
     repo = DatasetRepository(session)
     existing = await repo.get_by_dataset_id(cleaned_id)
@@ -230,6 +242,9 @@ async def upload_dataset(
             object_key=object_key,
             content_type="text/csv; charset=utf-8",
         )
+        if settings.APP_ENV == "production" and upload_res.provider != "r2":
+            storage_service.delete_object(object_key)
+            raise RuntimeError("Durable R2 object storage is required for production uploads")
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
@@ -250,6 +265,8 @@ async def upload_dataset(
     try:
         new_dataset = await repo.create(
             dataset_id=cleaned_id,
+            owner_id=user_id,
+            is_public=False,
             name=dataset_name,
             description=description.strip() if description else "",
             task_type=task_type,
@@ -276,6 +293,7 @@ async def upload_dataset(
 @router.get("/{dataset_id}/download")
 async def download_dataset(
     dataset_id: str,
+    user_id: Optional[uuid.UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Download the raw CSV dataset file from Cloudflare R2 or local fallback storage."""
@@ -286,6 +304,8 @@ async def download_dataset(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Dataset '{dataset_id}' not found.",
         )
+
+    assert_dataset_access(dataset, user_id)
 
     storage_key = (dataset.metadata_ or {}).get("storage_key") or f"datasets/{dataset_id}/data.csv"
 
@@ -318,6 +338,7 @@ async def download_dataset(
 @router.get("/{dataset_id}", response_model=DatasetSchema)
 async def get_dataset(
     dataset_id: str,
+    user_id: Optional[uuid.UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> DatasetSchema:
     """Get a specific dataset by ID."""
@@ -330,6 +351,7 @@ async def get_dataset(
             detail=f"Dataset {dataset_id} not found",
         )
 
+    assert_dataset_access(dataset, user_id)
     return _dataset_to_schema(dataset)
 
 

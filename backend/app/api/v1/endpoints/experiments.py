@@ -227,7 +227,7 @@ def _experiment_to_summary(experiment) -> ExperimentSummarySchema:
         completedAt=_format_iso(experiment.completed_at),
         observedBoundary=result.observed_boundary if result else None,
         errorMessage=experiment.error_message,
-        results=_build_results(result, experiment.evaluation_metric or "f1") if result else None,
+        results=_build_results(result, experiment.evaluation_metric or "f1", experiment.failure_threshold) if result else None,
     )
 
 
@@ -265,20 +265,20 @@ def _experiment_to_detail(experiment) -> ExperimentDetailSchema:
     )
 
 
-def _build_results(result, eval_metric: str = "f1") -> dict:
+def _build_results(result, eval_metric: str = "f1", failure_threshold: float | None = None) -> dict:
     """Build results dict from ExperimentResult model."""
     if not result:
         return None
 
-    baseline_val = float(result.baseline_macro_f1) if result.baseline_macro_f1 is not None else 0.958
-    worst_val = float(result.worst_case_macro_f1) if result.worst_case_macro_f1 is not None else 0.8538
+    baseline_val = float(result.baseline_macro_f1) if result.baseline_macro_f1 is not None else None
+    worst_val = float(result.worst_case_macro_f1) if result.worst_case_macro_f1 is not None else None
 
     return {
         "baselineScore": baseline_val,
         "worstCaseScore": worst_val,
-        "baselineMetrics": {eval_metric: baseline_val},
-        "worstCaseMetrics": {eval_metric: worst_val},
-        "failureThreshold": 0.80,
+        "baselineMetrics": {eval_metric: baseline_val} if baseline_val is not None else {},
+        "worstCaseMetrics": {eval_metric: worst_val} if worst_val is not None else {},
+        "failureThreshold": float(failure_threshold) if failure_threshold is not None else None,
         "observedBoundary": result.observed_boundary,
         "observedBoundaryLabel": "Observed failure boundary under the specified experimental configuration.",
         "observed_boundary_caveat": "Observed failure boundary under the specified experimental configuration.",

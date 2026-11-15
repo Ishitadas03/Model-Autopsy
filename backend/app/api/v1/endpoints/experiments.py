@@ -7,6 +7,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
+from app.core.auth import get_current_user, assert_experiment_access, assert_dataset_access
+from app.repositories.dataset import DatasetRepository
 from app.repositories.experiment import ExperimentRepository, ExperimentRunRepository, ExperimentResultRepository
 from app.schemas import (
     ExperimentSummarySchema,
@@ -25,6 +27,7 @@ async def list_experiments(
     skip: int = Query(0, ge=0),
     limit: int = Query(100, ge=1, le=1000),
     status_filter: Optional[str] = Query(None, alias="status"),
+    user_id: Optional[UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> List[ExperimentSummarySchema]:
     """List all submitted and completed autopsy experiments."""
@@ -33,14 +36,14 @@ async def list_experiments(
     if status_filter:
         try:
             run_status = RunStatus(status_filter)
-            experiments = await repo.get_by_status(run_status, skip, limit)
+            experiments = await repo.get_by_status(run_status, skip, limit, owner_id=user_id)
         except ValueError:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail=f"Invalid status: {status_filter}",
             )
     else:
-        experiments = await repo.get_all(skip, limit)
+        experiments = await repo.get_all(skip, limit, owner_id=user_id)
 
     return [_experiment_to_summary(exp) for exp in experiments]
 
@@ -48,6 +51,7 @@ async def list_experiments(
 @router.get("/{experiment_id}", response_model=ExperimentDetailSchema)
 async def get_experiment(
     experiment_id: str,
+    user_id: Optional[UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ExperimentDetailSchema:
     """Fetch status, telemetry, and results for a single experiment."""
@@ -77,19 +81,21 @@ async def get_experiment(
 @router.post("/run", response_model=ExperimentDetailSchema, status_code=status.HTTP_201_CREATED)
 async def create_experiment(
     request: ExperimentRunRequest,
+    user_id: Optional[UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ExperimentDetailSchema:
     """Submit a new stress-testing autopsy job."""
     from app.services.experiment_service import ExperimentService
 
     service = ExperimentService(session)
-    experiment = await service.create_experiment(request)
+    experiment = await service.create_experiment(request, owner_id=user_id)
     return _experiment_to_detail(experiment)
 
 
 @router.post("/baseline")
 async def evaluate_baseline_endpoint(
     request: dict,
+    user_id: Optional[UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ):
     """Execute holdout baseline training and return real scientific metrics."""
@@ -97,18 +103,23 @@ async def evaluate_baseline_endpoint(
 
     try:
         req_obj = BaselineEvaluationRequest(**request)
+        dataset = await DatasetRepository(session).get_by_dataset_id(req_obj.dataset_id)
+        assert_dataset_access(dataset, user_id)
         res = await baseline_service.evaluate_baseline(req_obj, session)
         return res.model_dump(by_alias=True)
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Baseline evaluation failed: {str(e)}",
+            detail="Baseline evaluation failed: invalid dataset or configuration",
         )
 
 
 @router.post("/{experiment_id}/cancel", response_model=ExperimentCancelResponse)
 async def cancel_experiment(
     experiment_id: str,
+    user_id: Optional[UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ExperimentCancelResponse:
     """Request cancellation of an actively running or queued experiment."""
@@ -133,6 +144,7 @@ async def cancel_experiment(
             detail=f"Experiment {experiment_id} not found",
         )
 
+    assert_experiment_access(experiment, user_id)
     try:
         cancel_data = await service.cancel_experiment(experiment.id)
         return ExperimentCancelResponse(
@@ -151,6 +163,7 @@ async def cancel_experiment(
 @router.get("/{experiment_id}/progress", response_model=ExperimentProgressSchema)
 async def get_experiment_progress(
     experiment_id: str,
+    user_id: Optional[UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> ExperimentProgressSchema:
     """Get real-time progress for a running experiment."""
@@ -169,6 +182,8 @@ async def get_experiment_progress(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+
+    assert_experiment_access(experiment, user_id)
 
     status_val = experiment.status.value if hasattr(experiment.status, "value") else str(experiment.status)
     return ExperimentProgressSchema(

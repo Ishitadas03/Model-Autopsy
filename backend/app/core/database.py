@@ -84,9 +84,9 @@ async def init_db() -> None:
             version = (await conn.execute(text(
                 "SELECT version_num FROM alembic_version"
             ))).scalar_one_or_none()
-            if version != "003_durable_jobs":
+            if version != "004_tenant_rls":
                 raise RuntimeError(
-                    "Database migration required: apply Alembic revision 003_durable_jobs"
+                    "Database migration required: apply Alembic revision 004_tenant_rls"
                 )
         return
 

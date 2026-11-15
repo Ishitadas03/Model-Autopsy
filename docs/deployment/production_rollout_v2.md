@@ -1,5 +1,7 @@
 # Model Autopsy — Production rollout v2 (NOT yet approved for deployment)
 
+> **₹0 deployment update (2026-11-16):** This document described the original paid-worker proposal. The requested no-cost path is now `docs/deployment/free_tier_rollout.md` with `JOB_EXECUTION_MODE=embedded` on the existing Render Free web service. **Do not use the paid worker instructions below for this deployment.** Free mode does not guarantee continuous processing during Render sleep/restarts.
+
 This document corresponds to draft PR #7. **Do not merge or deploy** until the gates below are satisfied. The new web app deliberately rejects requests if required auth, database migration or durable R2 storage is absent. The worker is a **separate always-on service**, not a task created by the web request.
 
 ## Architecture and required accounts

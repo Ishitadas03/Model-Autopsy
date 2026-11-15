@@ -52,6 +52,7 @@ for p in [str(ML_ENGINE_SRC), str(BACKEND_DIR)]:
         sys.path.insert(0, p)
 
 from app.services.preprocessing import prepare_holdout
+from app.services.model_limits import validate_model_params
 
 
 def compute_sha256(path: Path) -> str:
@@ -121,7 +122,8 @@ def load_dataset_from_config(config: Dict[str, Any]) -> Tuple[pd.DataFrame, str,
 
 
 def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[str, Any]):
-    """Instantiate model adapter."""
+    """Instantiate a resource-bounded, explicitly supported model adapter."""
+    params = validate_model_params(model_name, task_type, params)
     is_classification = task_type == "classification"
     m_name = (model_name or "").lower()
 
@@ -129,18 +131,18 @@ def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[s
         if "logistic" in m_name:
             c = float(params.get("C", 1.0))
             max_iter = int(params.get("max_iter", 1000))
-            return LogisticRegression(C=c, max_iter=max_iter, random_state=seed)
+            return LogisticRegression(C=c, max_iter=max_iter, penalty=params.get("penalty", "l2"), solver=params.get("solver", "lbfgs"), random_state=seed)
         elif "gradient" in m_name or "gbm" in m_name:
             n_est = int(params.get("n_estimators", 100))
             lr = float(params.get("learning_rate", 0.1))
-            return GradientBoostingClassifier(n_estimators=n_est, learning_rate=lr, random_state=seed)
+            return GradientBoostingClassifier(n_estimators=n_est, learning_rate=lr, max_depth=params.get("max_depth", 3), random_state=seed)
         elif "svc" in m_name or "svm" in m_name:
             c = float(params.get("C", 1.0))
-            return SVC(C=c, probability=True, random_state=seed)
+            return SVC(C=c, kernel=params.get("kernel", "rbf"), gamma=params.get("gamma", "scale"), probability=True, random_state=seed)
         elif "random" in m_name or "rf" in m_name:
             n_est = int(params.get("n_estimators", 100))
             max_d = int(params.get("max_depth")) if params.get("max_depth") else None
-            return RandomForestClassifier(n_estimators=n_est, max_depth=max_d, random_state=seed)
+            return RandomForestClassifier(n_estimators=n_est, max_depth=max_d, min_samples_split=params.get("min_samples_split", 2), random_state=seed)
         else:
             raise ValueError(f"Unsupported classifier adapter: {model_name}")
     else:
@@ -148,16 +150,16 @@ def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[s
             alpha = float(params.get("alpha", 1.0))
             return Ridge(alpha=alpha, random_state=seed)
         elif "linear" in m_name:
-            return LinearRegression()
+            return LinearRegression(fit_intercept=params.get("fit_intercept", True))
         elif "gradient" in m_name:
             n_est = int(params.get("n_estimators", 100))
-            return GradientBoostingRegressor(n_estimators=n_est, random_state=seed)
+            return GradientBoostingRegressor(n_estimators=n_est, learning_rate=params.get("learning_rate", 0.1), max_depth=params.get("max_depth", 3), random_state=seed)
         elif "svr" in m_name:
-            return SVR()
+            return SVR(C=params.get("C", 1.0), kernel=params.get("kernel", "rbf"), gamma=params.get("gamma", "scale"))
         elif "random" in m_name or "rf" in m_name:
             n_est = int(params.get("n_estimators", 100))
             max_d = int(params.get("max_depth")) if params.get("max_depth") else None
-            return RandomForestRegressor(n_estimators=n_est, max_depth=max_d, random_state=seed)
+            return RandomForestRegressor(n_estimators=n_est, max_depth=max_d, min_samples_split=params.get("min_samples_split", 2), random_state=seed)
         else:
             raise ValueError(f"Unsupported regressor adapter: {model_name}")
 

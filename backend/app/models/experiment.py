@@ -191,6 +191,8 @@ class ExperimentResult(Base):
     )
 
     # Baseline metrics (clean data)
+    baseline_metrics: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    worst_case_metrics: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     baseline_macro_f1: Mapped[Optional[float]] = mapped_column(nullable=True)
     baseline_accuracy: Mapped[Optional[float]] = mapped_column(nullable=True)
     baseline_per_class: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

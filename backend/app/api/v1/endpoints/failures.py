@@ -7,6 +7,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
+from app.core.auth import get_current_user, assert_experiment_access
 from app.repositories.experiment import ExperimentRepository
 from app.repositories.failure_sample import FailureSampleRepository
 from app.schemas import FailedSample, ExperimentSummarySchema
@@ -20,6 +21,7 @@ async def get_failed_samples(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     filter_class: Optional[str] = Query(None, alias="filterClass", description="Filter by ground truth or predicted class"),
+    user_id: Optional[UUID] = Depends(get_current_user),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Retrieve paginated failed sample instances with feature values under clean vs. stressed states."""
@@ -40,6 +42,8 @@ async def get_failed_samples(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Experiment {experiment_id} not found",
         )
+
+    assert_experiment_access(experiment, user_id)
 
     samples, total = await fail_repo.get_by_experiment(
         experiment.id, page=page, page_size=limit, filter_class=filter_class

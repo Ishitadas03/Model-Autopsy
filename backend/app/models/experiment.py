@@ -75,6 +75,7 @@ class Experiment(Base):
     experiment_id: Mapped[str] = mapped_column(
         String(50), unique=True, nullable=False, index=True
     )  # e.g., "EXP-0241"
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     model_name: Mapped[str] = mapped_column(String(200), nullable=False)
     dataset_name: Mapped[str] = mapped_column(String(200), nullable=False)
     dataset_id: Mapped[str] = mapped_column(

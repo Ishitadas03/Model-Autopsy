@@ -146,13 +146,19 @@ async def cancel_experiment(
         )
 
     assert_experiment_access(experiment, user_id)
+    from app.models.experiment import ExperimentStatus
+    if experiment.status in (ExperimentStatus.COMPLETED, ExperimentStatus.FAILED):
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="Completed or failed experiments cannot be cancelled.",
+        )
     try:
         cancel_data = await service.cancel_experiment(experiment.id)
         return ExperimentCancelResponse(
             success=True,
             experiment_id=experiment.experiment_id,
             status="cancelled",
-            message=f"Experiment {experiment.experiment_id} terminated successfully.",
+            message=f"Experiment {experiment.experiment_id} marked cancelled.",
         )
     except Exception as e:
         raise HTTPException(

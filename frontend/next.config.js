@@ -9,14 +9,9 @@ const backendApiUrl =
 const nextConfig = {
   reactStrictMode: true,
   transpilePackages: ['three'],
-  async rewrites() {
-    return [
-      {
-        source: '/api/:path*',
-        destination: `${backendApiUrl.replace(/\/$/, '')}/api/:path*`,
-      },
-    ];
-  },
+  // API traffic is authenticated and proxied by app/api/[...path]/route.ts.
+  // A Next.js rewrite could forward requests without server-side session checks.
+
 };
 
 module.exports = nextConfig;

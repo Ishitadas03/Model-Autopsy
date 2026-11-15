@@ -33,7 +33,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e '.[dev]'
           pip install -e './backend[dev]'
-          pip install aiosqlite boto3 botocore
+          pip install aiosqlite boto3 botocore 'sqlalchemy[asyncio]'
       - name: Run ML research tests
         run: pytest -q ml_engine/tests
       - name: Run backend tests

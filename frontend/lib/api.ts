@@ -100,7 +100,7 @@ export const api = {
     return res.text();
   },
 
-  async createExperiment(newExp: Omit<Experiment, 'id' | 'createdAt' | 'status' | 'progressPercent'>): Promise<Experiment> {
+  async createExperiment(newExp: Omit<Experiment, 'id' | 'createdAt' | 'status' | 'progressPercent'> & { targetName?: string; modelParams?: Record<string, any>; severityLevels?: number[] }): Promise<Experiment> {
     if (USE_MOCKS) {
       await new Promise((r) => setTimeout(r, 200));
       const id = `EXP-0${Math.floor(250 + Math.random() * 700)}`;

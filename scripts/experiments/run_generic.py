@@ -51,6 +51,8 @@ for p in [str(ML_ENGINE_SRC), str(BACKEND_DIR)]:
     if p not in sys.path:
         sys.path.insert(0, p)
 
+from app.services.preprocessing import prepare_holdout
+
 
 def compute_sha256(path: Path) -> str:
     """Compute sha256 of file."""
@@ -113,16 +115,9 @@ def load_dataset_from_config(config: Dict[str, Any]) -> Tuple[pd.DataFrame, str,
     except Exception:
         pass
 
-    # 5. Fallback synthetic tabular dataset for unpersisted demo testing
-    np.random.seed(42)
-    n_samples = 200
-    n_features = 6
-    X_synth = np.random.randn(n_samples, n_features)
-    y_synth = (X_synth[:, 0] * 1.5 + X_synth[:, 1] * -1.0 + np.random.randn(n_samples) * 0.5 > 0).astype(int)
-    cols = [f"feature_{i+1}" for i in range(n_features)]
-    df_synth = pd.DataFrame(X_synth, columns=cols)
-    df_synth["target"] = y_synth
-    return df_synth, "target", task_type
+    raise FileNotFoundError(
+        f"Dataset '{ds_id}' is unavailable; refusing to evaluate synthetic replacement data"
+    )
 
 
 def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[str, Any]):
@@ -247,42 +242,14 @@ def main() -> int:
 
     # Load and preprocess dataset
     df, target_col, task_type = load_dataset_from_config(config)
+    if task_type not in ("classification", "regression"):
+        raise ValueError(f"Unsupported task type: {task_type}")
     is_classification = task_type == "classification"
 
     if target_col not in df.columns:
-        target_col = df.columns[-1]
+        raise ValueError(f"Target column {target_col!r} not found in dataset")
 
-    y_raw = df[target_col]
-    X_raw = df.drop(columns=[target_col])
-    feature_names = list(X_raw.columns)
-
-    numeric_cols = list(X_raw.select_dtypes(include=[np.number]).columns)
-    categorical_cols = [c for c in feature_names if c not in numeric_cols]
-
-    X_processed = pd.DataFrame(index=X_raw.index)
-    if numeric_cols:
-        num_imp = SimpleImputer(strategy="median")
-        X_num = num_imp.fit_transform(X_raw[numeric_cols])
-        for i, col in enumerate(numeric_cols):
-            X_processed[col] = X_num[:, i]
-
-    if categorical_cols:
-        cat_imp = SimpleImputer(strategy="most_frequent")
-        X_cat = cat_imp.fit_transform(X_raw[categorical_cols])
-        for i, col in enumerate(categorical_cols):
-            le = LabelEncoder()
-            X_processed[col] = le.fit_transform(X_cat[:, i].astype(str))
-
-    if is_classification:
-        target_le = LabelEncoder()
-        y_vec = target_le.fit_transform(y_raw.astype(str))
-        classes = [str(c) for c in target_le.classes_]
-    else:
-        y_vec = pd.to_numeric(y_raw, errors="coerce").fillna(0.0).values.astype(np.float64)
-        classes = []
-
-    X_mat = X_processed.values.astype(np.float64)
-    target_feature_indices = [feature_names.index(f) for f in target_features if f in feature_names]
+    feature_names = list(df.drop(columns=[target_col]).columns)
 
     # Multi-seed loop
     per_seed_records: Dict[int, List[Dict[str, Any]]] = {}
@@ -299,11 +266,16 @@ def main() -> int:
         seed_dir = output_dir / f"seed_{seed}"
         seed_dir.mkdir(parents=True, exist_ok=True)
 
-        # Train/Test split
-        stratify = y_vec if is_classification and len(np.unique(y_vec)) > 1 and np.all(np.bincount(y_vec) >= 2) else None
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_mat, y_vec, test_size=0.20, random_state=seed, stratify=stratify
+        # Each seed gets an independent split with train-only fitted preprocessing.
+        X_train, X_test, y_train, y_test, classes, feature_names = prepare_holdout(
+            df, target_col, task_type,
+            test_size=float(config.get("dataset", {}).get("test_size", 0.20)),
+            seed=seed,
         )
+        target_feature_indices = [
+            feature_names.index(feature)
+            for feature in target_features if feature in feature_names
+        ]
 
         train_std = np.std(X_train, axis=0)
         train_std[train_std == 0.0] = 1.0

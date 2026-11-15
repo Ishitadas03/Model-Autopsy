@@ -36,6 +36,7 @@ from app.repositories.experiment import (
     ExperimentRunRepository,
     ExperimentResultRepository,
 )
+from app.repositories.dataset import DatasetRepository
 from app.repositories.failure_sample import FailureSampleRepository
 from app.repositories.artifact import ArtifactRepository, ArtifactReferenceRepository
 from app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
@@ -82,7 +83,29 @@ class ExperimentService:
         seed = int(request.seed if request.seed is not None else 42)
         seeds = request.seeds or settings.DEFAULT_SEEDS
         stress_mode = request.stress_mode or "incremental"
-        severity_levels = [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3]
+        severity_levels = (
+            list(request.stress_config.severity_levels) if request.stress_config
+            else list(request.severity_levels or [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3])
+        )
+        if any(level < 0 or level > 1 for level in severity_levels):
+            raise InvalidExperimentConfigError("Severity levels must be in [0, 1]")
+        if request.num_seeds is not None and request.seeds is None:
+            seeds = [seed + i for i in range(request.num_seeds)]
+        if request.stress_config is not None:
+            pert_family = request.stress_config.type.value
+        dataset_record = await DatasetRepository(self.session).get_by_dataset_id(dataset_id)
+        if dataset_record is None:
+            raise InvalidExperimentConfigError(f"Unknown dataset: {dataset_id}")
+        target_name = request.target_name or dataset_record.target_name
+        if not target_name:
+            raise InvalidExperimentConfigError("Dataset target column is missing")
+        if request.task_type and str(request.task_type) not in (
+            dataset_record.task_type, f"TaskType.{dataset_record.task_type.upper()}"
+        ):
+            raise InvalidExperimentConfigError(
+                "Selected task type does not match the registered dataset"
+            )
+
 
         task_type_enum = self._to_task_type(request.task_type)
         pert_enum = self._to_stress_type(pert_family)
@@ -154,6 +177,10 @@ class ExperimentService:
             "stress_mode": stress_mode,
             "severity_levels": severity_levels,
             "target_features": target_features,
+            "target_column": target_name,
+            "hyperparameters": dict(request.model_params),
+            "model_type": request.model_id,
+            "test_size": request.test_size,
             "seeds": seeds,
         }
 
@@ -462,8 +489,11 @@ class ExperimentService:
                 except ImportError:
                     from backend.app.services.storage_service import storage_service
 
+                if not file_path_obj.exists():
+                    raise FileNotFoundError(f"Experiment artifact missing: {art['file_path']}")
                 if file_path_obj.exists():
-                    r2_key = f"experiments/{experiment.experiment_id}/{art['file_name']}"
+                    # Use the relative path including seed subdirectories to avoid collisions.
+                    r2_key = f"experiments/{art['file_path']}"
                     upload_res = storage_service.store_file(file_path_obj, r2_key, mime_type)
                     ref_repo = ArtifactReferenceRepository(session)
                     await ref_repo.create(
@@ -478,7 +508,14 @@ class ExperimentService:
                         },
                     )
             except Exception as e:
-                logger.warning(f"Storage replication error for {art.get('file_name')}: {e}")
+                logger.exception(
+                    "Required experiment artifact replication failed",
+                    experiment_id=experiment.experiment_id,
+                    artifact=art.get("file_name"),
+                )
+                raise RuntimeError(
+                    f"Experiment artifact persistence failed for {art.get('file_name')}"
+                ) from e
 
         # Store failed samples
         for s in failed_samples:

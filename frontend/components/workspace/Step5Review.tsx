@@ -44,37 +44,20 @@ export function Step5Review({ config }: Step5ReviewProps) {
     }
   };
 
-  const handleSaveDraft = async () => {
-    setIsSubmitting(true);
+  const handleSaveDraft = () => {
     try {
-      const exp = await api.createExperiment({
-        title: `${config.modelName || 'Model'} Autopsy Draft`,
-        datasetId: config.datasetId || 'credit-risk-demo',
-        datasetName: config.datasetName || 'Credit Risk Demo',
-        modelId: config.modelId || 'random-forest-classifier',
-        modelName: config.modelName || 'Random Forest',
-        taskType: config.taskType || 'classification',
-        stressConfig: {
-          type: config.stressType as any,
-          severityLevels: config.severityLevels,
-          mode: config.stressMode,
-          targetFeatures: config.targetFeatures,
-        },
-        metric: config.metric as any,
-        failureThreshold: config.failureThreshold,
-        testSize: config.testSize,
-        seed: config.seed,
-        numSeeds: config.numSeeds,
-      });
-
+      localStorage.setItem('model_autopsy_workspace_draft', JSON.stringify(config));
       toast({
-        type: 'info',
-        title: 'Draft Saved',
-        message: `Draft created as ${exp.id}`,
+        type: 'success',
+        title: 'Local draft saved',
+        message: 'Saved in this browser only. No experiment was started.',
       });
-      router.push('/experiments');
-    } finally {
-      setIsSubmitting(false);
+    } catch (error) {
+      toast({
+        type: 'error',
+        title: 'Could not save draft',
+        message: 'Browser storage is unavailable. Copy the manifest before leaving.',
+      });
     }
   };
 
@@ -99,6 +82,9 @@ export function Step5Review({ config }: Step5ReviewProps) {
         testSize: config.testSize,
         seed: config.seed,
         numSeeds: config.numSeeds,
+        targetName: config.targetColumn,
+        modelParams: config.modelParams ?? {},
+        severityLevels: config.severityLevels,
       });
 
       toast({
@@ -199,7 +185,7 @@ export function Step5Review({ config }: Step5ReviewProps) {
           className="w-full sm:w-auto gap-2"
         >
           <Save className="w-4 h-4" />
-          <span>Save as Draft</span>
+          <span>Save Locally</span>
         </Button>
 
         <Button

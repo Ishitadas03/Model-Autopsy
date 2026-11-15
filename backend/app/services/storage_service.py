@@ -368,10 +368,14 @@ class StorageService:
             content_type, _ = mimetypes.guess_type(str(path))
             content_type = content_type or "application/octet-stream"
 
+        if settings.STORAGE_PROVIDER == "r2" and not self.is_configured():
+            raise RuntimeError("R2 storage is required but not configured")
         if self.is_configured():
             result = self.upload_file_to_r2(path, object_key, content_type)
             if result:
                 return result
+            if settings.STORAGE_PROVIDER == "r2":
+                raise RuntimeError("Required R2 artifact upload failed")
             logger.warning("R2 upload failed; falling back to local storage", key=object_key)
 
         # Local storage fallback
@@ -399,10 +403,14 @@ class StorageService:
         sha256_hash = compute_sha256_bytes(data)
         file_size = len(data)
 
+        if settings.STORAGE_PROVIDER == "r2" and not self.is_configured():
+            raise RuntimeError("R2 storage is required but not configured")
         if self.is_configured():
             result = self.upload_bytes_to_r2(data, object_key, content_type)
             if result:
                 return result
+            if settings.STORAGE_PROVIDER == "r2":
+                raise RuntimeError("Required R2 dataset upload failed")
             logger.warning("R2 bytes upload failed; falling back to local storage", key=object_key)
 
         # Local storage fallback

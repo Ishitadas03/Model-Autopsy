@@ -36,6 +36,7 @@ from app.repositories.experiment import (
     ExperimentRunRepository,
     ExperimentResultRepository,
 )
+from app.repositories.dataset import DatasetRepository
 from app.repositories.failure_sample import FailureSampleRepository
 from app.repositories.artifact import ArtifactRepository, ArtifactReferenceRepository
 from app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
@@ -92,8 +93,18 @@ class ExperimentService:
             seeds = [seed + i for i in range(request.num_seeds)]
         if request.stress_config is not None:
             pert_family = request.stress_config.type.value
-        if not request.target_name:
-            raise InvalidExperimentConfigError("An explicit target column is required")
+        dataset_record = await DatasetRepository(self.session).get_by_dataset_id(dataset_id)
+        if dataset_record is None:
+            raise InvalidExperimentConfigError(f"Unknown dataset: {dataset_id}")
+        target_name = request.target_name or dataset_record.target_name
+        if not target_name:
+            raise InvalidExperimentConfigError("Dataset target column is missing")
+        if request.task_type and str(request.task_type) not in (
+            dataset_record.task_type, f"TaskType.{dataset_record.task_type.upper()}"
+        ):
+            raise InvalidExperimentConfigError(
+                "Selected task type does not match the registered dataset"
+            )
 
 
         task_type_enum = self._to_task_type(request.task_type)
@@ -166,7 +177,7 @@ class ExperimentService:
             "stress_mode": stress_mode,
             "severity_levels": severity_levels,
             "target_features": target_features,
-            "target_column": request.target_name,
+            "target_column": target_name,
             "hyperparameters": dict(request.model_params),
             "model_type": request.model_id,
             "test_size": request.test_size,

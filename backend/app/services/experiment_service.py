@@ -205,6 +205,7 @@ class ExperimentService:
                 progress_percent=0,
             )
 
+        exp_db_id = experiment.id
         # Production jobs are claimed by a separate database-leased worker.
         # No in-process task may run before the request transaction commits.
         if settings.JOB_EXECUTION_MODE == "inline":

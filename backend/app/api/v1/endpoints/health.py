@@ -59,7 +59,7 @@ async def readiness(request: Request) -> JSONResponse:
         from app.core.database import async_session_factory
         async with async_session_factory() as session:
             version = (await session.execute(text("SELECT version_num FROM alembic_version"))).scalar_one_or_none()
-            checks["database"] = version == "003_durable_jobs"
+            checks["database"] = version == "004_tenant_rls"
     except Exception:
         pass
 

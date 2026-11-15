@@ -32,14 +32,14 @@ def get_current_user(
         return None
     if not settings.AUTH_REQUIRED:
         raise HTTPException(status_code=503, detail="Authentication cannot be disabled in this environment")
-    if not settings.SUPABASE_URL:
-        raise HTTPException(status_code=503, detail="Authentication service is not configured")
     if credentials is None or credentials.scheme.lower() != "bearer":
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Valid bearer token required",
             headers={"WWW-Authenticate": "Bearer"},
         )
+    if not settings.SUPABASE_URL:
+        raise HTTPException(status_code=503, detail="Authentication service is not configured")
 
     base = settings.SUPABASE_URL.rstrip("/")
     url = base + "/auth/v1/.well-known/jwks.json"

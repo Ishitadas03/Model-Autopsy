@@ -1,4 +1,4 @@
-name: One-time Next.js security upgrade
+name: One-time patched Next.js 16 and Zod 4 security upgrade
 
 on:
   push:
@@ -22,16 +22,19 @@ jobs:
           node-version: '20'
           cache: npm
           cache-dependency-path: frontend/package-lock.json
-      - name: Install supported security-patched Next.js 15 and Sharp
+      - name: Install supported security-patched Next.js, React 19, and Zod 4
         run: |
-          npm install --prefix frontend --save-exact next@15.5.29 eslint-config-next@15.5.29 sharp@0.35.5
-          npm --prefix frontend ls next eslint-config-next sharp --depth=0
+          npm install --prefix frontend --save-exact next@16.4.6 eslint-config-next@16.4.6 react@19.2.3 react-dom@19.2.3 zod@4.6.7 sharp@0.35.5
+          npm install --prefix frontend --save-dev @types/react@^19 @types/react-dom@^19 eslint@^9
+          npm install --prefix frontend --save @react-three/fiber@^9 @react-three/drei@^10 framer-motion@^12
+          npm --prefix frontend ls next eslint-config-next react react-dom zod --depth=0
+          npm audit --prefix frontend --omit=dev --audit-level=high
       - name: Commit exact dependencies and lockfile to PR branch
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add frontend/package.json frontend/package-lock.json
           if ! git diff --cached --quiet; then
-            git commit -m "fix(security): upgrade Next.js to supported 15.5.29 and regenerate npm lockfile"
+            git commit -m "fix(security): upgrade Next.js 16, React 19, Zod 4 and lockfile"
             git push origin HEAD:feat/production-security-jobs-science
           fi

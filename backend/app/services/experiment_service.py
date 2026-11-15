@@ -139,6 +139,11 @@ class ExperimentService:
             seeds=seeds,
             seed=seed,
             stress_mode=stress_mode,
+            task_type=dataset_record.task_type,
+            target_name=target_name,
+            test_size=request.test_size,
+            model_params=dict(request.model_params),
+            target_features=list(request.stress_config.target_features or []) if request.stress_config else [],
         )
 
         target_features = (
@@ -327,26 +332,34 @@ class ExperimentService:
         seeds: List[int],
         seed: int,
         stress_mode: str,
+        task_type: str,
+        target_name: str,
+        test_size: float,
+        model_params: Dict[str, Any],
+        target_features: List[str],
     ) -> str:
-        """Generate YAML config for the experiment."""
+        """Generate the manifest from the actual selected configuration."""
         import yaml
 
         config = {
             "experiment": {
                 "name": experiment_id,
+                "task_type": task_type,
                 "model": {
                     "name": model_name,
-                    "type": "sklearn_rf",
-                    "hyperparameters": {"n_estimators": 100, "random_state": seed},
+                    "hyperparameters": model_params,
                 },
                 "dataset": {
                     "name": dataset_name,
                     "id": dataset_id,
+                    "target_column": target_name,
+                    "test_size": test_size,
                 },
                 "stress_test": {
                     "perturbation_family": perturbation_family,
                     "severity_levels": severity_levels,
                     "stress_mode": stress_mode,
+                    "target_features": target_features,
                 },
                 "evaluation": {
                     "metric": evaluation_metric,

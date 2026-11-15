@@ -65,10 +65,11 @@ class ExperimentService:
         # 1. Validate metric polarity and task compatibility
         self._validate_metric_polarity(request)
 
-        # 2. Check concurrency limit
-        running = await self.exp_repo.get_running_experiments()
-        if len(running) >= settings.MAX_CONCURRENT_EXPERIMENTS:
-            raise ConcurrencyLimitError(settings.MAX_CONCURRENT_EXPERIMENTS)
+        # Durable queue accepts jobs independently of current worker utilization.
+        if settings.JOB_EXECUTION_MODE == "inline":
+            running = await self.exp_repo.get_running_experiments()
+            if len(running) >= settings.MAX_CONCURRENT_EXPERIMENTS:
+                raise ConcurrencyLimitError(settings.MAX_CONCURRENT_EXPERIMENTS)
 
         # 3. Generate human-readable experiment ID (e.g., EXP-0001)
         experiment_id = await self.exp_repo.get_next_experiment_id()
@@ -133,6 +134,7 @@ class ExperimentService:
         experiment = await self.exp_repo.create(
             experiment_id=experiment_id,
             owner_id=owner_id,
+            execution_payload=request_data,
             model_name=model_name,
             dataset_name=dataset_name,
             dataset_id=dataset_id,
@@ -186,12 +188,17 @@ class ExperimentService:
             "seeds": seeds,
         }
 
-        # Spawn background execution task
-        exp_db_id = experiment.id
-        task = asyncio.create_task(
-            self._run_experiment_background(exp_db_id, experiment_type, request_data)
-        )
-        ExperimentService._active_tasks[str(exp_db_id)] = task
+        # Production jobs are claimed by a separate database-leased worker.
+        # No in-process task may run before the request transaction commits.
+        if settings.JOB_EXECUTION_MODE == "inline":
+            if settings.APP_ENV == "production":
+                raise InvalidExperimentConfigError("Inline experiment execution is forbidden in production")
+            await self.session.commit()
+            exp_db_id = experiment.id
+            task = asyncio.create_task(
+                self._run_experiment_background(exp_db_id, experiment_type, request_data)
+            )
+            ExperimentService._active_tasks[str(exp_db_id)] = task
 
         logger.info(
             "Experiment created and queued",

@@ -52,7 +52,7 @@ Vercel server-side: `SUPABASE_URL`, `SUPABASE_ANON_KEY`, `BACKEND_API_URL`; brow
 
 1. Verify the GitHub Actions CI on the PR's **latest commit**; frontend typecheck/build, backend/ML pytest all green.
 2. Back up the existing Supabase DB; inspect the **actual** `alembic_version`, indexes, rows and RLS configuration. Check whether migration 001 matches the live schema, and do not blindly stamp/alter it.
-3. Rehearse revisions `002_tenant_security` and `003_durable_jobs` in staging using a sanitized copy. Verify that legacy private uploads remain inaccessible, anonymous requests return 401 and two users cannot access each other's rows.
+3. Rehearse revisions `002_tenant_security`, `003_durable_jobs` and `004_tenant_rls` in staging using a sanitized copy. Verify that legacy private uploads remain inaccessible, anonymous requests return 401 and two users cannot access each other's rows.
 4. Apply reviewed migrations only after verifying a working backup and current schema compatibility.
 5. Configure auth and R2 on Render and Vercel, set embedded execution on the **existing** free service, then merge/deploy only with all gates passed. Check `/api/ready`, deployed SHAs and startup logs.
 6. E2E exercise the entire workflow on small classification and regression CSVs, including restart/cancellation and R2 artifact download after restart; monitor memory and CPU.

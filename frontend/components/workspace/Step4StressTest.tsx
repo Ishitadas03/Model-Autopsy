@@ -92,7 +92,7 @@ export function Step4StressTest({
           { id: 'accuracy', name: 'Accuracy', direction: 'higher' },
           { id: 'precision', name: 'Precision', direction: 'higher' },
           { id: 'recall', name: 'Recall', direction: 'higher' },
-          { id: 'roc_auc', name: 'ROC-AUC', direction: 'higher' },
+          // ROC-AUC is unavailable until probability scoring is implemented in generic experiments.
         ]
       : [
           { id: 'mae', name: 'MAE (Mean Absolute Error)', direction: 'lower' },

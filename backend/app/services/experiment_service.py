@@ -41,6 +41,7 @@ from app.core.auth import can_read_dataset
 from app.repositories.failure_sample import FailureSampleRepository
 from app.repositories.artifact import ArtifactRepository, ArtifactReferenceRepository
 from app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
+from app.services.model_limits import validate_model_params
 from app.schemas import ExperimentRunRequest
 
 logger = get_logger(__name__)
@@ -141,6 +142,12 @@ class ExperimentService:
 
 
         resolved_task_type = request.task_type or dataset_record.task_type
+        try:
+            validated_params = validate_model_params(
+                model_name, resolved_task_type, request.model_params
+            )
+        except ValueError as exc:
+            raise InvalidExperimentConfigError(str(exc)) from exc
         task_type_enum = self._to_task_type(resolved_task_type)
         pert_enum = self._to_stress_type(pert_family)
         mode_enum = self._to_stress_mode(stress_mode)
@@ -163,7 +170,7 @@ class ExperimentService:
             task_type=dataset_record.task_type,
             target_name=target_name,
             test_size=request.test_size,
-            model_params=dict(request.model_params),
+            model_params=validated_params,
             target_features=list(request.stress_config.target_features or []) if request.stress_config else [],
         )
 
@@ -188,7 +195,7 @@ class ExperimentService:
             "severity_levels": severity_levels,
             "target_features": target_features,
             "target_column": target_name,
-            "hyperparameters": dict(request.model_params),
+            "hyperparameters": validated_params,
             "model_type": request.model_id,
             "test_size": request.test_size,
             "seeds": seeds,

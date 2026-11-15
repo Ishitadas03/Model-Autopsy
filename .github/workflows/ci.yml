@@ -22,6 +22,8 @@ jobs:
       DATABASE_URL: sqlite+aiosqlite:///./ci_test.db
       STORAGE_PROVIDER: auto
       DEBUG: 'false'
+      APP_ENV: test
+      AUTH_REQUIRED: 'false'
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

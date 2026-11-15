@@ -31,6 +31,7 @@ from sklearn.metrics import (
 
 from app.core.logging import get_logger
 from app.repositories.dataset import DatasetRepository
+from app.services.preprocessing import prepare_holdout
 from app.services.storage_service import storage_service
 
 logger = get_logger(__name__)
@@ -101,56 +102,11 @@ class BaselineService:
 
         if task_type not in ("classification", "regression"):
             raise ValueError(f"Unsupported task type '{task_type}'")
-        # 2. Preprocess feature columns
-        numeric_cols = list(X_raw.select_dtypes(include=[np.number]).columns)
-        categorical_cols = [c for c in feature_names if c not in numeric_cols]
-
-        X_processed = pd.DataFrame(index=X_raw.index)
-
-        # Handle numeric features
-        if numeric_cols:
-            num_imputer = SimpleImputer(strategy="median")
-            X_num = num_imputer.fit_transform(X_raw[numeric_cols])
-            for i, col in enumerate(numeric_cols):
-                X_processed[col] = X_num[:, i]
-
-        # Handle categorical features via one-hot or frequency encoding
-        if categorical_cols:
-            cat_imputer = SimpleImputer(strategy="most_frequent")
-            X_cat = cat_imputer.fit_transform(X_raw[categorical_cols])
-            for i, col in enumerate(categorical_cols):
-                le = LabelEncoder()
-                X_processed[col] = le.fit_transform(X_cat[:, i].astype(str))
-
-        # 3. Preprocess target
-        if is_classification:
-            le_target = LabelEncoder()
-            y_processed = le_target.fit_transform(y_raw.astype(str))
-            classes = [str(c) for c in le_target.classes_]
-        else:
-            y_processed = pd.to_numeric(y_raw, errors="coerce").fillna(0.0).values.astype(np.float64)
-            classes = []
-
-        X_mat = X_processed.values.astype(np.float64)
-        y_vec = y_processed
-
-        # 4. Stratified or random hold-out split
-        test_size = max(0.05, min(0.50, float(request.test_size)))
+        # Split first; impute and encode features using training samples only.
+        test_size = float(request.test_size)
         seed = int(request.seed)
-
-        stratify = None
-        if is_classification and len(classes) > 1:
-            # Check minimum class count for stratification
-            _, class_counts = np.unique(y_vec, return_counts=True)
-            if np.all(class_counts >= 2):
-                stratify = y_vec
-
-        X_train, X_test, y_train, y_test = train_test_split(
-            X_mat,
-            y_vec,
-            test_size=test_size,
-            random_state=seed,
-            stratify=stratify,
+        X_train, X_test, y_train, y_test, classes, feature_names = prepare_holdout(
+            df, target_col, task_type, test_size, seed,
         )
 
         # 5. Instantiate model adapter

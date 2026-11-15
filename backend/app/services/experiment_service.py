@@ -139,6 +139,7 @@ class ExperimentService:
         # Request data for ML engine bridge
         request_data = {
             "experiment_id": experiment_id,
+            "use_generic": True,
             "model_name": model_name,
             "dataset_name": dataset_name,
             "dataset_id": dataset_id,

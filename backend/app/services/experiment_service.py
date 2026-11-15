@@ -347,7 +347,8 @@ class ExperimentService:
         return yaml.dump(config, default_flow_style=False)
 
     async def _run_experiment_background(
-        self, experiment_db_id: uuid.UUID, experiment_type: str, request_data: Dict[str, Any]
+        self, experiment_db_id: uuid.UUID, experiment_type: str, request_data: Dict[str, Any],
+        expected_lease_owner: Optional[str] = None,
     ) -> None:
         """Isolated background runner with dedicated database session."""
         try:
@@ -357,6 +358,14 @@ class ExperimentService:
 
                 experiment = await exp_repo.get_by_id(experiment_db_id)
                 if not experiment:
+                    return
+                if expected_lease_owner and (
+                    experiment.lease_owner != expected_lease_owner
+                    or experiment.status != ExperimentStatus.RUNNING
+                ):
+                    logger.warning("Worker lost lease before start", experiment_id=request_data["experiment_id"])
+                    return
+                if experiment.status == ExperimentStatus.CANCELLED:
                     return
 
                 experiment.status = ExperimentStatus.RUNNING
@@ -377,7 +386,12 @@ class ExperimentService:
                         p_exp_repo = ExperimentRepository(prog_session)
                         p_run_repo = ExperimentRunRepository(prog_session)
                         p_exp = await p_exp_repo.get_by_id(experiment_db_id)
-                        if p_exp:
+                        if p_exp and (
+                            expected_lease_owner is None or (
+                                p_exp.lease_owner == expected_lease_owner
+                                and p_exp.status == ExperimentStatus.RUNNING
+                            )
+                        ):
                             p_exp.progress_percent = progress.progress
                             p_exp.current_seed_index = progress.seed_index
                             p_exp.current_severity_index = progress.severity_index
@@ -403,6 +417,12 @@ class ExperimentService:
 
             # Store completed results, artifacts, and failed samples
             async with session_context() as finish_session:
+                # Do not persist results when cancelled, expired, or claimed elsewhere.
+                finish_exp = await finish_session.get(Experiment, experiment_db_id, with_for_update=True)
+                if not finish_exp or finish_exp.status != ExperimentStatus.RUNNING:
+                    raise asyncio.CancelledError()
+                if expected_lease_owner and finish_exp.lease_owner != expected_lease_owner:
+                    raise asyncio.CancelledError()
                 await self._process_and_save_results(finish_session, experiment_db_id, result_data)
 
                 f_exp_repo = ExperimentRepository(finish_session)
@@ -569,7 +589,7 @@ class ExperimentService:
         run_repo = ExperimentRunRepository(session)
 
         exp = await exp_repo.get_by_id(experiment_db_id)
-        if exp:
+        if exp and exp.status not in (ExperimentStatus.FAILED, ExperimentStatus.COMPLETED):
             exp.status = ExperimentStatus.CANCELLED
             exp.completed_at = datetime.utcnow()
 
@@ -587,7 +607,7 @@ class ExperimentService:
         run_repo = ExperimentRunRepository(session)
 
         exp = await exp_repo.get_by_id(experiment_db_id)
-        if exp:
+        if exp and exp.status not in (ExperimentStatus.CANCELLED, ExperimentStatus.COMPLETED):
             exp.status = ExperimentStatus.FAILED
             exp.error_message = error_message
             exp.completed_at = datetime.utcnow()

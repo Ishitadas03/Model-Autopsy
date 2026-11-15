@@ -296,8 +296,11 @@ def main() -> int:
 
         # Train/Test split
         stratify = y_vec if is_classification and len(np.unique(y_vec)) > 1 and np.all(np.bincount(y_vec) >= 2) else None
+        split_size = float(config.get("dataset", {}).get("test_size", 0.20))
+        if not (0.05 <= split_size <= 0.50):
+            raise ValueError("Dataset test_size must be between 0.05 and 0.50")
         X_train, X_test, y_train, y_test = train_test_split(
-            X_mat, y_vec, test_size=0.20, random_state=seed, stratify=stratify
+            X_mat, y_vec, test_size=split_size, random_state=seed, stratify=stratify
         )
 
         train_std = np.std(X_train, axis=0)

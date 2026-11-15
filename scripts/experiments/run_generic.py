@@ -137,10 +137,12 @@ def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[s
         elif "svc" in m_name or "svm" in m_name:
             c = float(params.get("C", 1.0))
             return SVC(C=c, probability=True, random_state=seed)
-        else:
+        elif "random" in m_name or "rf" in m_name:
             n_est = int(params.get("n_estimators", 100))
             max_d = int(params.get("max_depth")) if params.get("max_depth") else None
             return RandomForestClassifier(n_estimators=n_est, max_depth=max_d, random_state=seed)
+        else:
+            raise ValueError(f"Unsupported classifier adapter: {model_name}")
     else:
         if "ridge" in m_name:
             alpha = float(params.get("alpha", 1.0))
@@ -152,10 +154,12 @@ def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[s
             return GradientBoostingRegressor(n_estimators=n_est, random_state=seed)
         elif "svr" in m_name:
             return SVR()
-        else:
+        elif "random" in m_name or "rf" in m_name:
             n_est = int(params.get("n_estimators", 100))
             max_d = int(params.get("max_depth")) if params.get("max_depth") else None
             return RandomForestRegressor(n_estimators=n_est, max_depth=max_d, random_state=seed)
+        else:
+            raise ValueError(f"Unsupported regressor adapter: {model_name}")
 
 
 def apply_stress_perturbation(
@@ -165,6 +169,7 @@ def apply_stress_perturbation(
     severity: float,
     seed: int,
     target_indices: Optional[List[int]] = None,
+    train_medians: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """Apply calibrated perturbation to test features."""
     if severity <= 0.0:
@@ -182,8 +187,9 @@ def apply_stress_perturbation(
         for j in indices:
             mask = rng.rand(n_rows) < severity
             if np.any(mask):
-                median_val = np.median(X_pert[~mask, j]) if np.any(~mask) else 0.0
-                X_pert[mask, j] = median_val
+                if train_medians is None:
+                    raise ValueError("Training medians are required for MCAR imputation")
+                X_pert[mask, j] = train_medians[j]
     elif "outlier" in st:
         for j in indices:
             mask = rng.rand(n_rows) < severity
@@ -312,6 +318,7 @@ def main() -> int:
 
         train_std = np.std(X_train, axis=0)
         train_std[train_std == 0.0] = 1.0
+        train_medians = np.median(X_train, axis=0)
 
         # Fit model
         model = instantiate_model(model_name, task_type, seed, hyperparams)
@@ -359,6 +366,7 @@ def main() -> int:
             X_stressed = apply_stress_perturbation(
                 X_test, train_std, stress_type, sev, seed=seed + int(sev * 1000),
                 target_indices=target_feature_indices,
+                train_medians=train_medians,
             )
 
             preds = model.predict(X_stressed)

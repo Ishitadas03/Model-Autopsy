@@ -64,7 +64,7 @@ export const ModelAdapterSchema = z.object({
   taskTypes: z.array(TaskTypeSchema),
   predictProba: z.boolean(),
   description: z.string(),
-  parameters: z.record(z.any()),
+  parameters: z.record(z.string(), z.any()),
 });
 export type ModelAdapter = z.infer<typeof ModelAdapterSchema>;
 
@@ -85,8 +85,8 @@ export const StatisticalValidationSchema = z.object({
 export type StatisticalValidation = z.infer<typeof StatisticalValidationSchema>;
 
 export const ExperimentResultsSchema = z.object({
-  baselineMetrics: z.record(z.number()),
-  worstCaseMetrics: z.record(z.number()),
+  baselineMetrics: z.record(z.string(), z.number()),
+  worstCaseMetrics: z.record(z.string(), z.number()),
   failureThreshold: z.number(),
   observedBoundary: z.number().nullable(),
   observedBoundaryLabel: z.string().default(
@@ -150,12 +150,10 @@ export const FailedSampleSchema = z.object({
   confidence: z.number().nullable(),
   stressType: StressTypeSchema,
   severity: z.number(),
-  features: z.record(
-    z.object({
+  features: z.record(z.string(), z.object({
       clean: z.number(),
       stressed: z.number(),
-    })
-  ),
+    })),
 });
 export type FailedSample = z.infer<typeof FailedSampleSchema>;
 
@@ -204,12 +202,12 @@ export const CorruptionAggregateResultSchema = z.object({
   mean_observed_boundary: z.number().nullable(),
   earliest_individual_boundary: z.number().nullable(),
   boundary_caption: z.string(),
-  monotonicity_summary: z.record(z.any()).optional(),
+  monotonicity_summary: z.record(z.string(), z.any()).optional(),
 });
 export type CorruptionAggregateResult = z.infer<typeof CorruptionAggregateResultSchema>;
 
 export const ModelComparisonDataSchema = z.object({
-  corruptions: z.record(CorruptionAggregateResultSchema),
+  corruptions: z.record(z.string(), CorruptionAggregateResultSchema),
 });
 export type ModelComparisonData = z.infer<typeof ModelComparisonDataSchema>;
 
@@ -229,13 +227,13 @@ export const E003ComparisonDataSchema = z.object({
     dataset_hash: z.string(),
     split_seed: z.number(),
   }),
-  models_metadata: z.record(z.any()),
+  models_metadata: z.record(z.string(), z.any()),
   seeds_config: z.object({
     split_seed: z.number(),
     research_seeds: z.array(z.number()),
   }),
   failure_threshold: z.number(),
-  models: z.record(ModelComparisonDataSchema),
+  models: z.record(z.string(), ModelComparisonDataSchema),
 });
 export type E003ComparisonData = z.infer<typeof E003ComparisonDataSchema>;
 

@@ -29,6 +29,8 @@ class Dataset(Base):
     dataset_id: Mapped[str] = mapped_column(
         String(100), unique=True, nullable=False, index=True
     )  # e.g., "german-credit", "iris"
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
+    is_public: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     name: Mapped[str] = mapped_column(String(200), nullable=False)
     description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     task_type: Mapped[str] = mapped_column(String(50), nullable=False)  # classification, regression

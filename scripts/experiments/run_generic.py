@@ -292,6 +292,7 @@ def main() -> int:
 
     base_f1s = []
     base_accs = []
+    baseline_primary_scores = []
     feature_vuln_accs: Dict[str, List[float]] = {f: [] for f in feature_names}
 
     for s_idx, seed in enumerate(seeds):
@@ -323,11 +324,21 @@ def main() -> int:
             b_acc = float(accuracy_score(y_test, base_preds))
             base_f1s.append(b_f1)
             base_accs.append(b_acc)
+            baseline_primary_scores.append({
+                "f1": b_f1, "accuracy": b_acc,
+                "precision": float(precision_score(y_test, base_preds, average="macro", zero_division=0)),
+                "recall": float(recall_score(y_test, base_preds, average="macro", zero_division=0)),
+            }[metric_name])
         else:
             b_f1 = float(r2_score(y_test, base_preds))  # R2; never serialize as F1
             b_acc = float(mean_absolute_error(y_test, base_preds))  # MAE
             base_f1s.append(b_f1)
             base_accs.append(b_acc)
+            baseline_primary_scores.append({
+                "r2": b_f1,
+                "mae": b_acc,
+                "rmse": float(np.sqrt(mean_squared_error(y_test, base_preds))),
+            }[metric_name])
 
         # Severity sweep
         seed_records = []
@@ -414,57 +425,117 @@ def main() -> int:
             noise = np.random.RandomState(seed + j).normal(0.0, 0.20 * train_std[j], size=len(X_test))
             X_single[:, j] += noise
             single_preds = model.predict(X_single)
-            score = float(f1_score(y_test, single_preds, average="macro", zero_division=0)) if is_classification else float(r2_score(y_test, single_preds))
-            drop = max(0.0, b_f1 - score)
+            if is_classification:
+                scored = {
+                    "f1": float(f1_score(y_test, single_preds, average="macro", zero_division=0)),
+                    "accuracy": float(accuracy_score(y_test, single_preds)),
+                    "precision": float(precision_score(y_test, single_preds, average="macro", zero_division=0)),
+                    "recall": float(recall_score(y_test, single_preds, average="macro", zero_division=0)),
+                }
+            else:
+                scored = {
+                    "r2": float(r2_score(y_test, single_preds)),
+                    "mae": float(mean_absolute_error(y_test, single_preds)),
+                    "rmse": float(np.sqrt(mean_squared_error(y_test, single_preds))),
+                }
+            score = scored[metric_name]
+            clean_score = baseline_primary_scores[s_idx]
+            drop = max(
+                0.0, score - clean_score
+                if metric_name in {"mae", "rmse"} else clean_score - score
+            )
             feature_vuln_accs[fname].append(drop)
 
-    # Multi-seed Statistical Aggregation
+    # Multi-seed Statistical Aggregation — metric names and polarity are explicit.
+    def summarize(values: List[float]) -> Dict[str, Any]:
+        vals = np.asarray(values, dtype=float)
+        mean = float(np.mean(vals))
+        sem = float(stats.sem(vals)) if len(vals) > 1 else None
+        interval = None
+        if sem is not None and np.isfinite(sem):
+            critical = float(stats.t.ppf(0.975, len(vals) - 1))
+            interval = [
+                round(mean - critical * sem, 6),
+                round(mean + critical * sem, 6),
+            ]
+        return {
+            "mean": round(mean, 6),
+            "sem": round(sem, 6) if sem is not None else None,
+            "ci_95": interval,
+            "n": len(vals),
+        }
+
+    metric_keys = (
+        ["f1", "accuracy", "precision", "recall"]
+        if is_classification else ["r2", "mae", "rmse"]
+    )
     severity_aggregates = []
     curve_data = []
+    lower_is_better = metric_name in {"mae", "rmse"}
 
     for sev_idx, sev in enumerate(severities):
-        f1_vals = [per_seed_records[s][sev_idx]["macro_f1"] for s in seeds]
-        acc_vals = [per_seed_records[s][sev_idx]["accuracy"] for s in seeds]
-
-        f1_mean = float(np.mean(f1_vals))
-        f1_sem = float(stats.sem(f1_vals)) if len(seeds) > 1 else 0.0
-        acc_mean = float(np.mean(acc_vals))
-        acc_sem = float(stats.sem(acc_vals)) if len(seeds) > 1 else 0.0
-
-        ci_f1 = (f1_mean - 1.96 * f1_sem, f1_mean + 1.96 * f1_sem)
-        ci_acc = (acc_mean - 1.96 * acc_sem, acc_mean + 1.96 * acc_sem)
-
+        all_metrics = {
+            key: summarize([per_seed_records[seed][sev_idx][key] for seed in seeds])
+            for key in metric_keys
+        }
+        primary = all_metrics[metric_name]
+        is_failed = (
+            primary["mean"] > failure_threshold
+            if lower_is_better else primary["mean"] < failure_threshold
+        )
         severity_aggregates.append({
             "severity": sev,
-            "macro_f1": {"mean": round(f1_mean, 4), "sem": round(f1_sem, 4), "ci_95": [round(ci_f1[0], 4), round(ci_f1[1], 4)]},
-            "accuracy": {"mean": round(acc_mean, 4), "sem": round(acc_sem, 4), "ci_95": [round(ci_acc[0], 4), round(ci_acc[1], 4)]},
-            "is_failed": f1_mean < failure_threshold,
+            "metric": metric_name,
+            "score": primary,
+            "metrics": all_metrics,
+            "is_failed": is_failed,
+            **({"macro_f1": all_metrics["f1"], "accuracy": all_metrics["accuracy"]}
+               if is_classification else {
+                   "r2": all_metrics["r2"], "mae": all_metrics["mae"], "rmse": all_metrics["rmse"]
+               }),
         })
-
         curve_data.append({
             "severity": sev,
-            "mean_macro_f1": round(f1_mean, 4),
-            "sem_macro_f1": round(f1_sem, 4),
-            "ci_lower": round(ci_f1[0], 4),
-            "ci_upper": round(ci_f1[1], 4),
-            "mean_accuracy": round(acc_mean, 4),
-            "sem_accuracy": round(acc_sem, 4),
+            "metric": metric_name,
+            "mean_score": primary["mean"],
+            "sem_score": primary["sem"],
+            "ci_lower": primary["ci_95"][0] if primary["ci_95"] else None,
+            "ci_upper": primary["ci_95"][1] if primary["ci_95"] else None,
+            **({
+                "mean_macro_f1": all_metrics["f1"]["mean"],
+                "mean_accuracy": all_metrics["accuracy"]["mean"],
+            } if is_classification else {
+                "mean_r2": all_metrics["r2"]["mean"],
+                "mean_mae": all_metrics["mae"]["mean"],
+                "mean_rmse": all_metrics["rmse"]["mean"],
+            }),
         })
 
-    # Overall Observed Failure Boundary
-    overall_boundary = None
-    for agg in severity_aggregates:
-        if agg["macro_f1"]["mean"] < failure_threshold:
-            overall_boundary = agg["severity"]
-            break
+    overall_boundary = next(
+        (item["severity"] for item in severity_aggregates if item["is_failed"]),
+        None,
+    )
+    primary_values = [item["score"]["mean"] for item in severity_aggregates]
+    worst_index = (
+        int(np.argmax(primary_values)) if lower_is_better
+        else int(np.argmin(primary_values))
+    )
+    worst_case = severity_aggregates[worst_index]
+    baseline_primary = float(np.mean(baseline_primary_scores))
+    primary_worst = worst_case["score"]["mean"]
+    # Baseline and worst-case measure the selected metric, never a different one.
+    baseline_metrics = {metric_name: round(baseline_primary, 6)}
+    worst_case_metrics = {
+        key: worst_case["metrics"][key]["mean"] for key in metric_keys
+    }
 
-    # Feature Vulnerabilities Ranking
     feature_vulnerabilities = []
     for fname, drops in feature_vuln_accs.items():
         mean_drop = float(np.mean(drops)) if drops else 0.0
         feature_vulnerabilities.append({
             "feature": fname,
-            "drop": round(mean_drop, 4),
+            "metric": metric_name,
+            "drop": round(mean_drop, 6),
             "caveat": "Empirical sensitivity — not a causal explanation.",
         })
     feature_vulnerabilities.sort(key=lambda x: x["drop"], reverse=True)

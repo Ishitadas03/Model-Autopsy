@@ -679,6 +679,18 @@ class ExperimentService:
         experiment = await self.exp_repo.get_by_id(experiment_db_id)
         if not experiment:
             raise ExperimentNotFoundError(str(experiment_db_id))
+        if experiment.status in (ExperimentStatus.COMPLETED, ExperimentStatus.FAILED):
+            raise InvalidExperimentConfigError(
+                "A completed or failed experiment cannot be cancelled"
+            )
+        if experiment.status == ExperimentStatus.CANCELLED:
+            return {
+                "success": True,
+                "experimentId": experiment.experiment_id,
+                "status": "cancelled",
+                "terminatedPid": None,
+                "confirmedStopped": None,
+            }
 
         # Cancel bridge subprocess if active
         bridge_res = await ml_engine_bridge.cancel_experiment(experiment.experiment_id)

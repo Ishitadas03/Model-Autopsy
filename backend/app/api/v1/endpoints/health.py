@@ -7,10 +7,12 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
+    from app.core.auth import get_current_user
     from app.core.config import settings
     from app.core.database import get_session
     from app.services.storage_service import storage_service
 except ImportError:
+    from backend.app.core.auth import get_current_user
     from backend.app.core.config import settings
     from backend.app.core.database import get_session
     from backend.app.services.storage_service import storage_service
@@ -27,10 +29,9 @@ async def health_check(request: Request, session: AsyncSession = Depends(get_ses
     except Exception:
         db_status = "error"
 
+    # Public health probes must not disclose storage bucket identifiers or config.
     storage_info = {
-        "active_provider": storage_service.active_provider,
-        "is_r2_configured": storage_service.is_configured(),
-        "bucket_name": storage_service.bucket_name,
+        "configured": storage_service.is_configured(),
     }
 
     return {
@@ -90,14 +91,13 @@ async def readiness(request: Request) -> JSONResponse:
 
 
 @router.get("/storage/status", response_model=dict)
-async def storage_status() -> dict:
-    """Detailed Cloudflare R2 and local storage status verification."""
-    access_check = storage_service.check_bucket_access()
+async def storage_status(
+    user_id=Depends(get_current_user),
+) -> dict:
+    """Authenticated storage status without exposing provider internals or secrets."""
+    access_check = await asyncio.to_thread(storage_service.check_bucket_access)
     return {
-        "active_provider": storage_service.active_provider,
-        "is_r2_configured": storage_service.is_configured(),
-        "bucket_name": storage_service.bucket_name,
-        "bucket_accessible": access_check.get("accessible", False),
-        "access_details": access_check,
-
+        "configured": storage_service.is_configured(),
+        "accessible": bool(access_check.get("accessible")),
+        "provider": storage_service.active_provider,
     }

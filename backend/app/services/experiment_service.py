@@ -117,7 +117,6 @@ class ExperimentService:
         # Generate config YAML
         config_yaml = self._generate_config_yaml(
             experiment_id=experiment_id,
-            owner_id=owner_id,
             model_name=model_name,
             dataset_name=dataset_name,
             dataset_id=dataset_id,
@@ -133,6 +132,7 @@ class ExperimentService:
         # Create experiment record in database
         experiment = await self.exp_repo.create(
             experiment_id=experiment_id,
+            owner_id=owner_id,
             model_name=model_name,
             dataset_name=dataset_name,
             dataset_id=dataset_id,

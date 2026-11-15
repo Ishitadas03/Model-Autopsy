@@ -119,6 +119,10 @@ export const api = {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(newExp),
     });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      throw new Error(error.detail || `Experiment creation failed (HTTP ${res.status})`);
+    }
     return res.json();
   },
 
@@ -131,6 +135,10 @@ export const api = {
       return { success: true };
     }
     const res = await fetch(`/api/experiments/${id}/cancel`, { method: 'POST' });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      throw new Error(error.detail || `Experiment cancellation failed (HTTP ${res.status})`);
+    }
     return res.json();
   },
 
@@ -140,10 +148,12 @@ export const api = {
     }
     const res = await fetch('/api/datasets');
     if (!res.ok) {
-      return [...MOCK_DATASETS];
+      const error = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      throw new Error(error.detail || `Datasets request failed (HTTP ${res.status})`);
     }
     const data = await res.json();
-    return Array.isArray(data) && data.length > 0 ? data : [...MOCK_DATASETS];
+    if (!Array.isArray(data)) throw new Error('Invalid datasets response: expected an array');
+    return data;
   },
 
   async uploadDataset(
@@ -210,10 +220,12 @@ export const api = {
     }
     const res = await fetch('/api/models');
     if (!res.ok) {
-      return [...MOCK_MODELS];
+      const error = await res.json().catch(() => ({ detail: `HTTP ${res.status}` }));
+      throw new Error(error.detail || `Models request failed (HTTP ${res.status})`);
     }
     const data = await res.json();
-    return Array.isArray(data) && data.length > 0 ? data : [...MOCK_MODELS];
+    if (!Array.isArray(data)) throw new Error('Invalid models response: expected an array');
+    return data;
   },
 
   async getFailedSamples(

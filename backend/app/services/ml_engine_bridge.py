@@ -127,7 +127,14 @@ class MLEngineBridge:
         progress_callback=None,
     ) -> Dict[str, Any]:
         """Run an ML engine experiment asynchronously."""
-        script_path = self._get_script_path(experiment_type, request_data.get("dataset_id"))
+        # UI-configured jobs always use the manifest-driven generic runner.
+        # Canonical E001-E006 research scripts are reserved for explicit CLI runs;
+        # they do not necessarily honor selected model/target/severity settings.
+        script_path = (
+            self.scripts_dir / "run_generic.py"
+            if request_data.get("use_generic")
+            else self._get_script_path(experiment_type, request_data.get("dataset_id"))
+        )
 
         # Create output directory
         output_dir = self.artifacts_dir / experiment_id

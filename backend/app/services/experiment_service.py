@@ -7,7 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -100,6 +100,26 @@ class ExperimentService:
             raise InvalidExperimentConfigError("Severity levels must be finite numbers in [0, 1]")
         if request.num_seeds is not None and request.seeds is None:
             seeds = [seed + i for i in range(request.num_seeds)]
+        elif settings.JOB_EXECUTION_MODE == "embedded" and request.seeds is None:
+            seeds = [seed]  # Default to one seed on Render Free.
+
+        if settings.JOB_EXECUTION_MODE == "embedded":
+            if len(seeds) > settings.EMBEDDED_MAX_SEEDS:
+                raise InvalidExperimentConfigError(
+                    f"Free tier allows at most {settings.EMBEDDED_MAX_SEEDS} seeds per experiment"
+                )
+            if len(severity_levels) > settings.EMBEDDED_MAX_SEVERITIES:
+                raise InvalidExperimentConfigError(
+                    f"Free tier allows at most {settings.EMBEDDED_MAX_SEVERITIES} stress levels"
+                )
+            active = (await self.session.execute(
+                select(func.count(Experiment.id)).where(
+                    Experiment.owner_id == owner_id,
+                    Experiment.status.in_([ExperimentStatus.QUEUED, ExperimentStatus.RUNNING]),
+                )
+            )).scalar_one()
+            if active >= settings.EMBEDDED_MAX_ACTIVE_JOBS_PER_USER:
+                raise ConcurrencyLimitError(settings.EMBEDDED_MAX_ACTIVE_JOBS_PER_USER)
         if request.stress_config is not None:
             pert_family = request.stress_config.type.value
         dataset_record = await DatasetRepository(self.session).get_by_dataset_id(dataset_id)

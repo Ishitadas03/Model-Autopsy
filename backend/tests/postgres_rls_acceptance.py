@@ -173,10 +173,13 @@ def verify():
         try:
             cursor.execute("UPDATE public.experiments SET progress_percent=77 WHERE experiment_id='EXP-TENANT-A'")
         except psycopg2.Error as exc:
+            # PostgreSQL can reject UPDATE outright, depending on privileges.
             assert exc.pgcode in ("42501", "44000"), exc
             cursor.execute("ROLLBACK TO SAVEPOINT before_write")
         else:
-            raise AssertionError("Authenticated direct browser updates must fail")
+            # With table-level UPDATE privilege but no RLS UPDATE policy,
+            # PostgreSQL may instead silently affect zero rows.
+            assert cursor.rowcount == 0, "A direct user update bypassed RLS"
         cursor.execute("ROLLBACK")
 
         cursor.execute(

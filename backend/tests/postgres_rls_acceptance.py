@@ -79,7 +79,7 @@ def seed():
 
 
 def owner_read(cursor, role, user):
-    cursor.execute("BEGIN")
+    cursor.execute("SAVEPOINT tenant_read_scope")
     cursor.execute(f"SET LOCAL ROLE {role}")
     if user:
         cursor.execute("SELECT set_config('request.jwt.claim.sub', %s, true)", (user,))
@@ -93,7 +93,8 @@ def owner_read(cursor, role, user):
     runs = cursor.fetchone()[0]
     cursor.execute("SELECT count(*) FROM public.artifact_manifests")
     artifacts = cursor.fetchone()[0]
-    cursor.execute("ROLLBACK")
+    cursor.execute("ROLLBACK TO SAVEPOINT tenant_read_scope")
+    cursor.execute("RELEASE SAVEPOINT tenant_read_scope")
     return ids, experiments, runs, artifacts
 
 
@@ -164,7 +165,7 @@ def verify():
         ids_anon, exps_anon, runs_anon, arts_anon = owner_read(cursor, "anon", None)
         assert not ids_anon and not exps_anon and not runs_anon and not arts_anon
 
-        cursor.execute("BEGIN")
+        cursor.execute("SAVEPOINT owner_write_scope")
         cursor.execute("SET LOCAL ROLE authenticated")
         cursor.execute(
             "SELECT set_config('request.jwt.claim.sub', %s, true)", (OWN_A,)
@@ -180,7 +181,8 @@ def verify():
             # With table-level UPDATE privilege but no RLS UPDATE policy,
             # PostgreSQL may instead silently affect zero rows.
             assert cursor.rowcount == 0, "A direct user update bypassed RLS"
-        cursor.execute("ROLLBACK")
+        cursor.execute("ROLLBACK TO SAVEPOINT owner_write_scope")
+        cursor.execute("RELEASE SAVEPOINT owner_write_scope")
 
         cursor.execute(
             "SELECT has_function_privilege('anon','public.rls_auto_enable()','EXECUTE')"

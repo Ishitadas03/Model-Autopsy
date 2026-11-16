@@ -4,7 +4,7 @@
 
 Model Autopsy is a machine learning reliability research project that systematically investigates how and why ML models fail under controlled data corruption and changing evaluation conditions. Rather than treating model evaluation as a single accuracy number on clean test data, Model Autopsy stress-tests models the way engineers stress-test materials — applying controlled perturbations, measuring degradation trajectories, and documenting exactly where and how performance breaks down.
 
-> **Status:** Active research — four experiments completed, interactive dashboard operational, fifth experiment in planning.
+> **Release status:** The production-hardening branch is staged in [PR #7](https://github.com/Ishitadas03/Model-Autopsy/pull/7). It includes authenticated user workspaces, uploaded CSV classification/regression, a durable queue and verified artifact downloads. Production migration and live deployment remain blocked on backup/recovery and environment verification. See the [current verification report](docs/deployment/release_verification_2026-11-16.md) and [free-tier rollout guide](docs/deployment/free_tier_rollout.md). Research results below describe their individual experimental protocols; they are not proof of live deployment readiness.
 
 ---
 

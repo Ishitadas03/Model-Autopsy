@@ -1,6 +1,6 @@
 """Single-process durable experiment worker.
 
-Deploy as a separate always-on worker service. PostgreSQL SKIP LOCKED prevents
+Runs embedded in the web process or in a separate worker. PostgreSQL SKIP LOCKED prevents
 two worker instances from claiming the same queued experiment. Expired leases
 are marked failed, not automatically replayed: ML jobs can have side effects
 (e.g. persisted artifacts) and blindly retrying creates duplicate records.
@@ -70,9 +70,11 @@ async def mark_abandoned() -> int:
             )
         ).scalars().all()
         for exp in rows:
-            exp.status = ExperimentStatus.FAILED
-            exp.error_message = "Worker lease expired. Verify artifacts before manually re-submitting."
-            exp.completed_at = now_utc()
+            await ExperimentService(session)._mark_experiment_failed(
+                session, exp.id,
+                "Worker lease expired. Verify artifacts before manually re-submitting.",
+                expected_lease_owner=exp.lease_owner,
+            )
             exp.lease_owner = None
             exp.lease_expires_at = None
             count += 1
@@ -88,10 +90,9 @@ async def heartbeat(experiment_db_id: uuid.UUID, experiment_id: str, task: async
             return
         try:
             async with session_context() as session:
-                exp = await session.get(Experiment, experiment_db_id)
-                if not exp or exp.lease_owner != WORKER_ID or exp.status != ExperimentStatus.RUNNING:
+                exp = await session.get(Experiment, experiment_db_id, with_for_update=True)
+                if not exp or not ExperimentService._owns_live_lease(exp, WORKER_ID):
                     logger.warning("Experiment lease lost or cancelled", experiment_id=experiment_id)
-                    await ml_engine_bridge.cancel_experiment(experiment_id)
                     task.cancel()
                     return
                 exp.lease_expires_at = now_utc() + timedelta(seconds=settings.WORKER_LEASE_SECONDS)
@@ -110,25 +111,40 @@ async def run_claimed_job(job: tuple[uuid.UUID, str, dict]) -> None:
         experiment_db_id, experiment_type, payload, expected_lease_owner=WORKER_ID,
     ))
     hb = asyncio.create_task(heartbeat(experiment_db_id, experiment_id, run))
+    failure_reason = None
     try:
         await asyncio.wait_for(run, timeout=settings.EXPERIMENT_TIMEOUT_SECONDS)
     except asyncio.TimeoutError:
         logger.error("ML experiment reached execution timeout", experiment_id=experiment_id)
-        await ml_engine_bridge.cancel_experiment(experiment_id)
-        run.cancel()
-        await asyncio.gather(run, return_exceptions=True)
-        async with session_context() as session:
-            exp = await session.get(Experiment, experiment_db_id)
-            if exp and exp.lease_owner == WORKER_ID and exp.status == ExperimentStatus.RUNNING:
-                exp.status = ExperimentStatus.FAILED
-                exp.error_message = "Experiment timed out"
-                exp.completed_at = now_utc()
+        failure_reason = "Experiment timed out"
+    except asyncio.CancelledError:
+        # Child cancellation (user cancel / lost lease) must not stop the queue.
+        # Cancellation of THIS task is process shutdown and must propagate.
+        if asyncio.current_task().cancelling():
+            failure_reason = "Worker stopped before experiment completed"
+            raise
+        failure_reason = "Experiment execution stopped before completion"
+    except Exception:
+        failure_reason = "Worker could not complete experiment execution"
+        logger.exception("Claimed experiment execution failed", experiment_id=experiment_id)
     finally:
         hb.cancel()
         await asyncio.gather(hb, return_exceptions=True)
+        if not run.done():
+            run.cancel()
+        await asyncio.gather(run, return_exceptions=True)
+        await ml_engine_bridge.cancel_experiment(experiment_id)
         async with session_context() as session:
-            exp = await session.get(Experiment, experiment_db_id)
+            exp = await session.get(Experiment, experiment_db_id, with_for_update=True)
             if exp and exp.lease_owner == WORKER_ID:
+                if exp.status == ExperimentStatus.RUNNING:
+                    await ExperimentService(session)._mark_experiment_failed(
+                        session, experiment_db_id,
+                        failure_reason or "Experiment returned without a committed result",
+                        expected_lease_owner=WORKER_ID,
+                    )
+                # Release only after a terminal state is committed in the same
+                # transaction. On DB failure the lease remains recoverable.
                 exp.lease_owner = None
                 exp.lease_expires_at = None
 

@@ -57,6 +57,9 @@ def get_current_user(
         if claims.get("role") != "authenticated":
             raise ValueError("Unexpected token role")
         user = UUID(str(claims["sub"]))
+    except jwt.PyJWKClientConnectionError:
+        # A provider outage must not invalidate a user's session as a bad JWT.
+        raise HTTPException(status_code=503, detail="Authentication verification temporarily unavailable")
     except (jwt.PyJWTError, ValueError, TypeError, KeyError):
         raise HTTPException(
             status_code=401, detail="Invalid or expired authentication token",

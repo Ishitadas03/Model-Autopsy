@@ -1,21 +1,17 @@
 """Artifact endpoints for canonical experiment artifacts."""
 
 from enum import Enum
-from pathlib import Path
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
-from fastapi.responses import FileResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
-    from app.core.config import settings
     from app.core.database import get_session
     from app.core.auth import get_current_user, assert_experiment_access
     from app.repositories.experiment import ExperimentRepository
 except ImportError:
-    from backend.app.core.config import settings
     from backend.app.core.database import get_session
     from backend.app.core.auth import get_current_user, assert_experiment_access
     from backend.app.repositories.experiment import ExperimentRepository
@@ -82,101 +78,6 @@ async def get_experiment_artifact(
         except ValueError:
             pass
     assert_experiment_access(experiment, user_id)
-
-    base_dir = settings.ARTIFACTS_BASE_DIR.resolve()
-    exp_dir = (base_dir / experiment_id).resolve()
-    target_path = (exp_dir / artifact_type).resolve()
-
-    # 1. Path traversal security check
-    if not target_path.is_relative_to(exp_dir):
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Invalid path traversal sequence.",
-        )
-
-    # 2. Check canonical aliases if exact target does not exist
-    if not (target_path.exists() and target_path.is_file()):
-        aliases = {
-            "results.json": [
-                "aggregate_comparison.json",
-                "aggregate_results.json",
-                "results.json",
-                "failure_patterns_summary.json",
-                "metrics.json",
-            ],
-            "curves.csv": [
-                "aggregate_comparison.csv",
-                "aggregate_results.csv",
-                "results.csv",
-                "curves.csv",
-                "sample_level_metrics.csv",
-                "feature_vulnerability_summary.csv",
-                "shift_summary.csv",
-            ],
-            "report.md": ["report.md"],
-            "manifest.json": ["manifest.json", "reproducibility_manifest.json"],
-        }
-        for cand in aliases.get(artifact_type.lower(), []):
-            cand_p = (exp_dir / cand).resolve()
-            if cand_p.exists() and cand_p.is_file():
-                target_path = cand_p
-                break
-
-    # 3. If literal or aliased file exists in artifact directory, serve it directly
-    if target_path.exists() and target_path.is_file():
-        suffix = target_path.suffix.lower()
-        if suffix not in ALLOWED_EXTENSIONS:
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="File extension not permitted.",
-            )
-        return FileResponse(
-            path=target_path,
-            filename=target_path.name,
-            media_type=MIME_MAP.get(suffix, "application/octet-stream"),
-        )
-
-    # 2b. If local file is missing, check Cloudflare R2 object storage
-    try:
-        try:
-            from app.services.storage_service import storage_service
-        except ImportError:
-            from backend.app.services.storage_service import storage_service
-        if storage_service.is_configured():
-            candidates = [artifact_type] + aliases.get(artifact_type.lower(), [])
-            for cand in candidates:
-                r2_key = f"experiments/{experiment_id}/{cand}"
-                if storage_service.object_exists_in_r2(r2_key):
-                    presigned = storage_service.generate_presigned_url(r2_key)
-                    if presigned:
-                        from fastapi.responses import RedirectResponse
-                        return RedirectResponse(url=presigned, status_code=307)
-                    content = storage_service.get_object_bytes_from_r2(r2_key)
-                    if content is not None:
-                        suffix = Path(cand).suffix.lower()
-                        return Response(
-                            content=content,
-                            media_type=MIME_MAP.get(suffix, "application/octet-stream"),
-                            headers={"Content-Disposition": f'attachment; filename="{cand}"'},
-                        )
-    except Exception:
-        pass
-
-    # 3. Otherwise try database lookup for dynamic experiment runs
-    exp_repo = ExperimentRepository(session)
-    experiment = await exp_repo.get_by_experiment_id(experiment_id)
-    if not experiment:
-        try:
-            uuid_id = UUID(experiment_id)
-            experiment = await exp_repo.get_with_details(uuid_id)
-        except ValueError:
-            pass
-
-    if not experiment:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Experiment '{experiment_id}' or artifact '{artifact_type}' not found",
-        )
 
     service = ArtifactService(session)
     try:

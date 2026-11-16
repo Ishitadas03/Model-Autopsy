@@ -7,7 +7,7 @@ import shutil
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 import boto3
 from botocore.client import Config
@@ -145,20 +145,31 @@ class StorageService:
 
     def get_local_path(self, object_key: str) -> Path:
         """Resolve an object key to a safe absolute local path."""
-        # Sanitize object key to prevent directory traversal
-        sanitized = object_key.strip("/\\")
-        parts = [p for p in sanitized.split("/") if p and p != ".."]
+        # Reject ambiguous keys; rewriting them can alias another object's key.
+        parts = object_key.split("/")
+        if not object_key or "\\" in object_key or "\x00" in object_key or any(
+            part in ("", ".", "..") or ":" in part for part in parts
+        ):
+            raise ValueError("Invalid storage object key")
         clean_key = Path(*parts)
 
-        if str(clean_key).startswith("datasets"):
-            rel_path = clean_key.relative_to("datasets") if len(clean_key.parts) > 1 else clean_key
+        if parts[0] == "datasets":
+            rel_path = Path(*parts[1:])
             base_dir = getattr(settings, "DATASETS_BASE_DIR", None) or (
                 settings.ML_ENGINE_PATH.parent / "data" / "datasets"
             )
-            return (base_dir / rel_path).resolve()
         else:
-            base_dir = settings.ARTIFACTS_BASE_DIR.resolve()
-            return (base_dir / clean_key).resolve()
+            base_dir = settings.ARTIFACTS_BASE_DIR
+            rel_path = clean_key
+        base_dir = Path(base_dir).resolve()
+        target = (base_dir / rel_path).resolve()
+        if not target.is_relative_to(base_dir):
+            raise ValueError("Storage object key escapes its base directory")
+        return target
+
+    def _require_local_fallback_allowed(self) -> None:
+        if settings.STORAGE_PROVIDER == "r2":
+            raise RuntimeError("Required R2 storage operation failed; local fallback is disabled")
 
     # -------------------------------------------------------------------------
     # Direct R2 Operations
@@ -251,7 +262,9 @@ class StorageService:
 
         dest = Path(destination_path)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        temp_dest = dest.with_suffix(dest.suffix + f".tmp_{os.getpid()}")
+        fd, temporary = tempfile.mkstemp(prefix=dest.name + ".", suffix=".tmp", dir=dest.parent)
+        os.close(fd)
+        temp_dest = Path(temporary)
 
         try:
             self.client.download_file(
@@ -437,6 +450,7 @@ class StorageService:
             if self.download_file_from_r2(object_key, destination_path):
                 return True
 
+        self._require_local_fallback_allowed()
         # 2. Try local fallback
         local_src = self.get_local_path(object_key)
         if local_src.exists() and local_src.is_file():
@@ -455,6 +469,7 @@ class StorageService:
             if data is not None:
                 return data
 
+        self._require_local_fallback_allowed()
         local_src = self.get_local_path(object_key)
         if local_src.exists() and local_src.is_file():
             try:
@@ -469,9 +484,13 @@ class StorageService:
     def object_exists(self, object_key: str) -> bool:
         """Check if an object exists in either R2 or local storage."""
         if self.is_configured():
-            if self.object_exists_in_r2(object_key):
+            exists = self.object_exists_in_r2(object_key)
+            if settings.STORAGE_PROVIDER == "r2":
+                return exists
+            if exists:
                 return True
 
+        self._require_local_fallback_allowed()
         local_src = self.get_local_path(object_key)
         return local_src.exists() and local_src.is_file()
 
@@ -480,6 +499,11 @@ class StorageService:
         deleted_r2 = False
         if self.is_configured():
             deleted_r2 = self.delete_object_from_r2(object_key)
+
+        if settings.STORAGE_PROVIDER == "r2":
+            if not deleted_r2:
+                self._require_local_fallback_allowed()
+            return deleted_r2
 
         deleted_local = False
         local_src = self.get_local_path(object_key)
@@ -500,6 +524,7 @@ class StorageService:
                 meta["provider"] = "r2"
                 return meta
 
+        self._require_local_fallback_allowed()
         local_src = self.get_local_path(object_key)
         if local_src.exists() and local_src.is_file():
             content_type, _ = mimetypes.guess_type(str(local_src))
@@ -534,8 +559,9 @@ class StorageService:
         """List objects in R2 with fallback to local files."""
         if self.is_configured():
             try:
-                response = self.client.list_objects_v2(Bucket=self.bucket_name, Prefix=prefix)
-                contents = response.get("Contents", [])
+                pages = self.client.get_paginator("list_objects_v2").paginate(
+                    Bucket=self.bucket_name, Prefix=prefix,
+                )
                 return [
                     {
                         "key": item["Key"],
@@ -543,19 +569,26 @@ class StorageService:
                         "last_modified": item["LastModified"].isoformat(),
                         "provider": "r2",
                     }
-                    for item in contents
+                    for page in pages for item in page.get("Contents", [])
                 ]
             except (ClientError, BotoCoreError) as e:
                 logger.error("Failed to list R2 objects", prefix=prefix, error=str(e))
 
+        self._require_local_fallback_allowed()
         # Local fallback listing
         results = []
-        base = settings.ARTIFACTS_BASE_DIR
-        target_dir = base / prefix if prefix else base
+        base = settings.ARTIFACTS_BASE_DIR.resolve()
+        target_dir = self.get_local_path(prefix.rstrip("/")) if prefix else base
+        if prefix.split("/")[0] == "datasets":
+            base = self.get_local_path("datasets")
         if target_dir.exists() and target_dir.is_dir():
             for p in target_dir.rglob("*"):
                 if p.is_file():
+                    if not p.resolve().is_relative_to(base):
+                        continue
                     rel_key = str(p.relative_to(base)).replace("\\", "/")
+                    if prefix.split("/")[0] == "datasets":
+                        rel_key = "datasets/" + rel_key
                     results.append({
                         "key": rel_key,
                         "size": p.stat().st_size,

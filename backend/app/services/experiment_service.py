@@ -3,7 +3,7 @@
 import asyncio
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -14,23 +14,18 @@ from app.core.config import settings
 from app.core.database import session_context
 from app.core.exceptions import (
     ConcurrencyLimitError,
-    ExperimentAlreadyRunningError,
-    ExperimentExecutionError,
     ExperimentNotFoundError,
     InvalidExperimentConfigError,
 )
 from app.core.logging import get_logger
 from app.models.experiment import (
     Experiment,
-    ExperimentRun,
-    ExperimentResult,
     ExperimentStatus,
     StressMode,
     StressType,
     TaskType,
 )
-from app.models.failure_sample import FailedSample
-from app.models.artifact import ArtifactManifest, ArtifactType
+from app.models.artifact import ArtifactType
 from app.repositories.experiment import (
     ExperimentRepository,
     ExperimentRunRepository,
@@ -52,6 +47,19 @@ class ExperimentService:
 
     # Class-level background task registry across requests
     _active_tasks: Dict[str, asyncio.Task] = {}
+
+    @staticmethod
+    def _owns_live_lease(experiment: Experiment, worker_id: str) -> bool:
+        expiry = experiment.lease_expires_at
+        if expiry is None:
+            return False
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        return (
+            experiment.lease_owner == worker_id
+            and experiment.status == ExperimentStatus.RUNNING
+            and expiry > datetime.now(timezone.utc)
+        )
 
     def __init__(self, session: AsyncSession):
         self.session = session
@@ -187,6 +195,8 @@ class ExperimentService:
             "model_name": model_name,
             "dataset_name": dataset_name,
             "dataset_id": dataset_id,
+            "dataset_storage_key": (dataset_record.metadata_ or {}).get("storage_key"),
+            "dataset_sha256": (dataset_record.metadata_ or {}).get("sha256"),
             "task_type": resolved_task_type,
             "perturbation_family": pert_family,
             "evaluation_metric": eval_metric,
@@ -412,16 +422,12 @@ class ExperimentService:
         """Isolated background runner with dedicated database session."""
         try:
             async with session_context() as session:
-                exp_repo = ExperimentRepository(session)
                 run_repo = ExperimentRunRepository(session)
 
-                experiment = await exp_repo.get_by_id(experiment_db_id)
+                experiment = await session.get(Experiment, experiment_db_id, with_for_update=True)
                 if not experiment:
                     return
-                if expected_lease_owner and (
-                    experiment.lease_owner != expected_lease_owner
-                    or experiment.status != ExperimentStatus.RUNNING
-                ):
+                if expected_lease_owner and not self._owns_live_lease(experiment, expected_lease_owner):
                     logger.warning("Worker lost lease before start", experiment_id=request_data["experiment_id"])
                     return
                 if experiment.status == ExperimentStatus.CANCELLED:
@@ -442,14 +448,10 @@ class ExperimentService:
             async def progress_callback(progress: ProgressData):
                 try:
                     async with session_context() as prog_session:
-                        p_exp_repo = ExperimentRepository(prog_session)
                         p_run_repo = ExperimentRunRepository(prog_session)
-                        p_exp = await p_exp_repo.get_by_id(experiment_db_id)
+                        p_exp = await prog_session.get(Experiment, experiment_db_id, with_for_update=True)
                         if p_exp and (
-                            expected_lease_owner is None or (
-                                p_exp.lease_owner == expected_lease_owner
-                                and p_exp.status == ExperimentStatus.RUNNING
-                            )
+                            expected_lease_owner is None or self._owns_live_lease(p_exp, expected_lease_owner)
                         ):
                             p_exp.progress_percent = progress.progress
                             p_exp.current_seed_index = progress.seed_index
@@ -480,7 +482,7 @@ class ExperimentService:
                 finish_exp = await finish_session.get(Experiment, experiment_db_id, with_for_update=True)
                 if not finish_exp or finish_exp.status != ExperimentStatus.RUNNING:
                     raise asyncio.CancelledError()
-                if expected_lease_owner and finish_exp.lease_owner != expected_lease_owner:
+                if expected_lease_owner and not self._owns_live_lease(finish_exp, expected_lease_owner):
                     raise asyncio.CancelledError()
                 await self._process_and_save_results(finish_session, experiment_db_id, result_data)
 
@@ -505,13 +507,18 @@ class ExperimentService:
 
         except asyncio.CancelledError:
             logger.info("Experiment run cancelled in background", db_id=str(experiment_db_id))
-            async with session_context() as cancel_session:
-                await self._mark_experiment_cancelled(cancel_session, experiment_db_id)
+            # The durable worker owns timeout/shutdown/lease-loss semantics.
+            # A cancelled asyncio task is not necessarily a user cancellation.
+            if expected_lease_owner is None:
+                async with session_context() as cancel_session:
+                    await self._mark_experiment_cancelled(cancel_session, experiment_db_id)
             raise
         except Exception as e:
             logger.exception("Experiment run failed in background", db_id=str(experiment_db_id))
             async with session_context() as fail_session:
-                await self._mark_experiment_failed(fail_session, experiment_db_id, str(e))
+                await self._mark_experiment_failed(
+                    fail_session, experiment_db_id, str(e), expected_lease_owner,
+                )
         finally:
             ExperimentService._active_tasks.pop(str(experiment_db_id), None)
 
@@ -646,13 +653,15 @@ class ExperimentService:
         return "application/octet-stream"
 
     async def _mark_experiment_cancelled(self, session: AsyncSession, experiment_db_id: uuid.UUID) -> None:
-        exp_repo = ExperimentRepository(session)
         run_repo = ExperimentRunRepository(session)
 
-        exp = await exp_repo.get_by_id(experiment_db_id)
-        if exp and exp.status not in (ExperimentStatus.FAILED, ExperimentStatus.COMPLETED):
-            exp.status = ExperimentStatus.CANCELLED
-            exp.completed_at = datetime.utcnow()
+        exp = await session.get(
+            Experiment, experiment_db_id, with_for_update=True, populate_existing=True,
+        )
+        if not exp or exp.status in (ExperimentStatus.FAILED, ExperimentStatus.COMPLETED):
+            return
+        exp.status = ExperimentStatus.CANCELLED
+        exp.completed_at = datetime.utcnow()
 
         runs = await run_repo.get_by_experiment(experiment_db_id)
         for r in runs:
@@ -662,16 +671,23 @@ class ExperimentService:
         await session.flush()
 
     async def _mark_experiment_failed(
-        self, session: AsyncSession, experiment_db_id: uuid.UUID, error_message: str
+        self, session: AsyncSession, experiment_db_id: uuid.UUID, error_message: str,
+        expected_lease_owner: Optional[str] = None,
     ) -> None:
-        exp_repo = ExperimentRepository(session)
         run_repo = ExperimentRunRepository(session)
 
-        exp = await exp_repo.get_by_id(experiment_db_id)
-        if exp and exp.status not in (ExperimentStatus.CANCELLED, ExperimentStatus.COMPLETED):
-            exp.status = ExperimentStatus.FAILED
-            exp.error_message = error_message
-            exp.completed_at = datetime.utcnow()
+        exp = await session.get(
+            Experiment, experiment_db_id, with_for_update=True, populate_existing=True,
+        )
+        if not exp or exp.status in (
+            ExperimentStatus.CANCELLED, ExperimentStatus.COMPLETED, ExperimentStatus.FAILED,
+        ):
+            return
+        if expected_lease_owner is not None and exp.lease_owner != expected_lease_owner:
+            return
+        exp.status = ExperimentStatus.FAILED
+        exp.error_message = error_message
+        exp.completed_at = datetime.utcnow()
 
         runs = await run_repo.get_by_experiment(experiment_db_id)
         for r in runs:
@@ -683,7 +699,9 @@ class ExperimentService:
 
     async def cancel_experiment(self, experiment_db_id: uuid.UUID) -> Dict[str, Any]:
         """Cancel a running or queued experiment."""
-        experiment = await self.exp_repo.get_by_id(experiment_db_id)
+        experiment = await self.session.get(
+            Experiment, experiment_db_id, with_for_update=True, populate_existing=True,
+        )
         if not experiment:
             raise ExperimentNotFoundError(str(experiment_db_id))
         if experiment.status in (ExperimentStatus.COMPLETED, ExperimentStatus.FAILED):
@@ -699,7 +717,13 @@ class ExperimentService:
                 "confirmedStopped": None,
             }
 
-        # Cancel bridge subprocess if active
+        # Commit the cancellation before stopping compute. Otherwise the runner
+        # can observe the killed subprocess and win a race to mark it FAILED.
+        await self._mark_experiment_cancelled(self.session, experiment_db_id)
+        await self.session.commit()
+
+        # Cancel bridge subprocess if active in this process. Remote workers
+        # observe the durable cancellation on their next heartbeat.
         bridge_res = await ml_engine_bridge.cancel_experiment(experiment.experiment_id)
 
         # Cancel async task if active
@@ -710,9 +734,6 @@ class ExperimentService:
                 await task
             except asyncio.CancelledError:
                 pass
-
-        # Update DB status
-        await self._mark_experiment_cancelled(self.session, experiment_db_id)
 
         return {
             "success": True,

@@ -69,7 +69,7 @@ def compute_sha256(path: Path) -> str:
 def load_dataset_from_config(config: Dict[str, Any]) -> Tuple[pd.DataFrame, str, str]:
     """Load dataframe from config path, storage, or benchmark."""
     ds_cfg = config.get("experiment", {}).get("dataset", {})
-    ds_id = str(ds_cfg.get("id", "")).strip().lower()
+    ds_id = str(ds_cfg.get("id", "")).strip()
     ds_path = ds_cfg.get("path")
     target_name = ds_cfg.get("target_column") or ds_cfg.get("target_name")
     task_type = (config.get("experiment", {}).get("task_type") or "classification").lower()
@@ -80,45 +80,16 @@ def load_dataset_from_config(config: Dict[str, Any]) -> Tuple[pd.DataFrame, str,
         return df, target_name or df.columns[-1], task_type
 
     # 2. Benchmark fallbacks
-    if ds_id in ("iris", "iris-dataset", "fisher-iris"):
+    if ds_id.lower() in ("iris", "iris-dataset", "fisher-iris"):
         from sklearn.datasets import load_iris
         raw = load_iris(as_frame=True)
         return raw.frame, "target", "classification"
 
-    if ds_id in ("credit-risk-demo", "german-credit", "german_credit"):
-        # Look for local csv in data/
-        for p in [
-            REPO_ROOT / "data" / "german_credit.csv",
-            REPO_ROOT / "data" / "credit-risk-demo.csv",
-            REPO_ROOT / "data" / f"{ds_id}.csv",
-        ]:
-            if p.exists():
-                df = pd.read_csv(p)
-                return df, target_name or df.columns[-1], task_type
-
-    # 3. Check artifacts/datasets/
-    for p in [
-        REPO_ROOT / "artifacts" / "datasets" / ds_id / "data.csv",
-        REPO_ROOT / "data" / f"{ds_id}.csv",
-    ]:
-        if p.exists():
-            df = pd.read_csv(p)
-            return df, target_name or df.columns[-1], task_type
-
-    # 4. Storage service lookup
-    try:
-        from app.services.storage_service import storage_service
-        raw_bytes = storage_service.get_object(f"datasets/{ds_id}/data.csv")
-        if raw_bytes:
-            import io
-            df = pd.read_csv(io.BytesIO(raw_bytes))
-            return df, target_name or df.columns[-1], task_type
-    except Exception:
-        pass
-
-    raise FileNotFoundError(
-        f"Dataset '{ds_id}' is unavailable; refusing to evaluate synthetic replacement data"
-    )
+    # Use the same registered object and checksum as the baseline. Never
+    # silently select an unrelated local file when durable storage is required.
+    from app.services.dataset_loader import load_registered_csv
+    df = load_registered_csv(ds_id, ds_cfg.get("storage_key"), ds_cfg.get("sha256"))
+    return df, target_name or df.columns[-1], task_type
 
 
 def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[str, Any]):

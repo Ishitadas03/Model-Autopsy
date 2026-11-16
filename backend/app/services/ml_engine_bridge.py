@@ -92,6 +92,8 @@ class MLEngineBridge:
                     "name": request_data.get("dataset_name", "Iris Dataset"),
                     "id": request_data.get("dataset_id", "iris"),
                     "path": request_data.get("dataset_path"),
+                    "storage_key": request_data.get("dataset_storage_key"),
+                    "sha256": request_data.get("dataset_sha256"),
                     "target_column": request_data.get("target_column") or request_data.get("target_name"),
                     "test_size": request_data.get("test_size", 0.20),
                 },

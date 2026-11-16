@@ -1,17 +1,17 @@
 """Artifact service for managing experiment artifacts."""
 
+import asyncio
+import hashlib
 import json
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Union
 from uuid import UUID
 
-from fastapi import Response
-from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse, StreamingResponse
+from fastapi import HTTPException, Response
 
 from app.core.config import settings
 from app.core.exceptions import ArtifactNotFoundError
 from app.core.logging import get_logger
-from app.models.artifact import ArtifactManifest, ArtifactType
 from app.repositories.artifact import ArtifactRepository
 from app.repositories.experiment import ExperimentRepository
 
@@ -48,60 +48,57 @@ class ArtifactService:
         format: str,
     ) -> Union[Dict[str, Any], Response]:
         """Get experiment artifact by type."""
+        aliases = {
+            "results_json": ["results.json", "aggregate_results.json", "aggregate_comparison.json", "metrics.json"],
+            "curves_csv": ["curves.csv", "aggregate_results.csv", "aggregate_comparison.csv", "results.csv"],
+            "report_md": ["report.md"],
+            "manifest_json": ["manifest.json", "reproducibility_manifest.json"],
+            "reproducibility_json": ["reproducibility.json"],
+        }
+        names = aliases.get(artifact_type, [artifact_type])
+        # Filename aliases and enum routes resolve to the same committed manifest.
+        for candidates in aliases.values():
+            if artifact_type in candidates:
+                names = [artifact_type] + [n for n in candidates if n != artifact_type]
+                break
+        manifests = await self.artifact_repo.get_by_experiment(experiment_id)
+        matches = [m for m in manifests if m.seed == seed and m.file_name in names]
+        if not matches:
+            raise ArtifactNotFoundError("No committed artifact matches this request")
+        manifest = min(matches, key=lambda m: names.index(m.file_name))
+        if Path(manifest.file_name).suffix.lower() not in {".json", ".csv", ".md", ".png", ".txt"}:
+            raise ArtifactNotFoundError("Artifact extension is not permitted")
+
+        from app.services.storage_service import storage_service
+        root = settings.ARTIFACTS_BASE_DIR.resolve()
+        file_path = (root / manifest.file_path).resolve()
+        if not file_path.is_relative_to(root):
+            raise ArtifactNotFoundError("Invalid artifact path")
+        with_refs = await self.artifact_repo.get_with_references(manifest.id)
+        r2_refs = [r for r in (with_refs.references if with_refs else []) if r.reference_type == "r2"]
         try:
-            artifact_type_enum = ArtifactType(artifact_type)
-        except ValueError:
-            raise ArtifactNotFoundError(f"Unknown artifact type: {artifact_type}")
-
-        manifest = await self.artifact_repo.get_by_experiment_and_type(
-            experiment_id, artifact_type_enum, seed
+            if settings.STORAGE_PROVIDER == "r2" or r2_refs:
+                key = r2_refs[0].reference_url if r2_refs else f"experiments/{manifest.file_path}"
+                # Never substitute process-local output for the durable object.
+                content = await asyncio.to_thread(storage_service.get_object_bytes_from_r2, key)
+                if content is None:
+                    raise HTTPException(status_code=503, detail="Artifact storage temporarily unavailable")
+            else:
+                content = await asyncio.to_thread(file_path.read_bytes)
+        except OSError:
+            raise ArtifactNotFoundError("Artifact file is unavailable")
+        digest = hashlib.sha256(content).hexdigest()
+        if not manifest.content_hash or digest != manifest.content_hash or len(content) != manifest.file_size_bytes:
+            raise HTTPException(status_code=503, detail="Artifact integrity verification failed")
+        return Response(
+            content=content,
+            media_type=manifest.mime_type,
+            headers={
+                "Content-Disposition": f'attachment; filename="{manifest.file_name}"',
+                "X-SHA256": digest,
+                "Cache-Control": "private, no-store",
+            },
         )
-
-        if not manifest:
-            raise ArtifactNotFoundError(
-                f"Artifact {artifact_type} for experiment {experiment_id} (seed={seed}) not found"
-            )
-
-        file_path = settings.ARTIFACTS_BASE_DIR / manifest.file_path
-
-        if not file_path.exists():
-            # If local file is missing, attempt to retrieve from storage service / Cloudflare R2
-            try:
-                try:
-                    from app.services.storage_service import storage_service
-                except ImportError:
-                    from backend.app.services.storage_service import storage_service
-
-                retrieved = False
-                manifest_with_refs = await self.artifact_repo.get_with_references(manifest.id)
-                if manifest_with_refs and manifest_with_refs.references:
-                    for ref in manifest_with_refs.references:
-                        if ref.reference_url and storage_service.retrieve_file(ref.reference_url, file_path):
-                            retrieved = True
-                            break
-                if not retrieved:
-                    # Try default key structure
-                    default_key = f"experiments/{manifest.file_path}"
-                    storage_service.retrieve_file(default_key, file_path)
-            except Exception as e:
-                logger.warning(f"Failed to fetch missing artifact from storage: {e}")
-
-        if not file_path.exists():
-            raise ArtifactNotFoundError(f"Artifact file not found: {file_path}")
-
-        format_str = str(format).lower()
-        if format_str == "json" and file_path.suffix == ".json":
-            return await self._serve_json_file(file_path)
-        elif format_str == "csv" and file_path.suffix == ".csv":
-            return await self._serve_csv_file(file_path)
-        elif format_str in ("markdown", "md") and file_path.suffix == ".md":
-            return await self._serve_markdown_file(file_path)
-        else:
-            return FileResponse(
-                path=file_path,
-                filename=manifest.file_name,
-                media_type=manifest.mime_type,
-            )
 
     async def _serve_json(self, directory: Path) -> Dict[str, Any]:
         """Serve JSON artifact from directory."""

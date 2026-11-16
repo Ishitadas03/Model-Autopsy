@@ -83,14 +83,14 @@ jobs:
           CREATE SCHEMA auth;
           CREATE FUNCTION auth.uid() RETURNS uuid
             LANGUAGE sql STABLE
-            AS $
+            AS $$
               SELECT NULLIF(current_setting('request.jwt.claim.sub', true),'')::uuid
-            $;
+            $$;
           GRANT USAGE ON SCHEMA auth TO authenticated;
           GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
           CREATE FUNCTION public.rls_auto_enable() RETURNS void
             LANGUAGE plpgsql SECURITY DEFINER
-            AS $ BEGIN NULL; END; $;
+            AS $$ BEGIN NULL; END; $$;
           SQL
       - name: Create original schema revision 001
         working-directory: backend

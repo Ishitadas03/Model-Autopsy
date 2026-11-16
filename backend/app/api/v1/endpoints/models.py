@@ -2,10 +2,13 @@
 
 from typing import List, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.database import get_session
+from app.core.auth import get_current_user, can_read_dataset
+from app.models.dataset import Dataset
 from app.repositories.model_adapter import ModelAdapterRepository
 from app.schemas import ModelAdapterSchema
 
@@ -53,6 +56,7 @@ def _generic_schema(spec: dict) -> ModelAdapterSchema:
 async def list_models(
     dataset_id: Optional[str] = Query(None, description="Filter by dataset ID"),
     session: AsyncSession = Depends(get_session),
+    user_id=Depends(get_current_user),
 ) -> List[ModelAdapterSchema]:
     """List supported pre-configured model adapters."""
     repo = ModelAdapterRepository(session)
@@ -63,7 +67,17 @@ async def list_models(
     else:
         models = await repo.get_active()
 
-    catalog = [_model_to_schema(m) for m in models]
+    dataset_ids = {model.dataset_id for model in models}
+    visible_ids: set[str] = set()
+    if dataset_ids:
+        datasets = (await session.execute(
+            select(Dataset).where(Dataset.dataset_id.in_(dataset_ids))
+        )).scalars().all()
+        visible_ids = {
+            dataset.dataset_id for dataset in datasets
+            if can_read_dataset(dataset, user_id)
+        }
+    catalog = [_model_to_schema(m) for m in models if m.dataset_id in visible_ids]
     catalog.extend(_generic_schema(spec) for spec in GENERIC_MODELS)
     return catalog
 
@@ -72,6 +86,7 @@ async def list_models(
 async def get_model(
     model_id: str,
     session: AsyncSession = Depends(get_session),
+    user_id=Depends(get_current_user),
 ) -> ModelAdapterSchema:
     """Get a specific model adapter by ID."""
     for spec in GENERIC_MODELS:
@@ -88,6 +103,11 @@ async def get_model(
             detail=f"Model {model_id} not found",
         )
 
+    dataset = (await session.execute(
+        select(Dataset).where(Dataset.dataset_id == model.dataset_id)
+    )).scalar_one_or_none()
+    if not can_read_dataset(dataset, user_id):
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Model not found")
     return _model_to_schema(model)
 
 

@@ -1,0 +1,123 @@
+name: Secure Supabase application backup (on demand)
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-backup-${{ github.repository }}
+  cancel-in-progress: false
+
+jobs:
+  encrypted-backup-and-restore-check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      SUPABASE_DB_URL: ${{ secrets.SUPABASE_DATABASE_URL }}
+      BACKUP_PASSPHRASE: ${{ secrets.MODEL_AUTOPSY_BACKUP_PASSPHRASE }}
+      CHECK_SQL: "SELECT 'datasets' AS name, count(*)::text FROM public.datasets UNION ALL SELECT 'model_adapters',count(*)::text FROM public.model_adapters UNION ALL SELECT 'experiments',count(*)::text FROM public.experiments UNION ALL SELECT 'experiment_runs',count(*)::text FROM public.experiment_runs UNION ALL SELECT 'experiment_results',count(*)::text FROM public.experiment_results UNION ALL SELECT 'failed_samples',count(*)::text FROM public.failed_samples UNION ALL SELECT 'artifact_manifests',count(*)::text FROM public.artifact_manifests UNION ALL SELECT 'artifact_references',count(*)::text FROM public.artifact_references ORDER BY name"
+    steps:
+      - name: Check required secrets without printing them
+        shell: bash
+        run: |
+          set -euo pipefail
+          test -n "$SUPABASE_DB_URL" || { echo "::error::Missing SUPABASE_DATABASE_URL repository secret"; exit 1; }
+          test -n "$BACKUP_PASSPHRASE" || { echo "::error::Missing MODEL_AUTOPSY_BACKUP_PASSPHRASE repository secret"; exit 1; }
+          test "${#BACKUP_PASSPHRASE}" -ge 24 || { echo "::error::Backup passphrase must contain at least 24 characters"; exit 1; }
+          case "$SUPABASE_DB_URL" in
+            postgres://*|postgresql://*) ;;
+            *) echo "::error::Use a standard PostgreSQL URI, not the SQLAlchemy asyncpg URL"; exit 1 ;;
+          esac
+          mkdir -p backup
+          chmod 700 backup
+
+      - name: Dump application data with PostgreSQL 17 client
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -e SUPABASE_DB_URL \
+            -v "$PWD/backup:/backup" postgres:17 \
+            sh -c 'pg_dump --dbname="$SUPABASE_DB_URL" --format=custom --no-owner --no-acl --file=/backup/model-autopsy.dump \
+              --table=public.alembic_version \
+              --table=public.datasets \
+              --table=public.model_adapters \
+              --table=public.experiments \
+              --table=public.experiment_runs \
+              --table=public.experiment_results \
+              --table=public.failed_samples \
+              --table=public.artifact_manifests \
+              --table=public.artifact_references'
+          test -s backup/model-autopsy.dump
+          docker run --rm --network host \
+            -v "$PWD/backup:/backup" postgres:17 \
+            pg_restore --list /backup/model-autopsy.dump >/dev/null
+
+      - name: Get source row counts for restoration verification
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm --network host \
+            -e SUPABASE_DB_URL -e CHECK_SQL \
+            postgres:17 sh -c 'psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -At -c "$CHECK_SQL"' \
+            > backup/source-counts.txt
+
+      - name: Restore into isolated disposable PostgreSQL 17 database
+        shell: bash
+        run: |
+          set -euo pipefail
+          docker run --rm -d --name model-autopsy-restore-check \
+            -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=local_restore_only \
+            -e POSTGRES_DB=restore_check -p 127.0.0.1:55432:5432 postgres:17
+          trap 'docker stop model-autopsy-restore-check >/dev/null 2>&1 || true' EXIT
+          ready=0
+          for i in $(seq 1 40); do
+            if docker exec model-autopsy-restore-check pg_isready -U postgres -d restore_check -q; then
+              ready=1
+              break
+            fi
+            sleep 1
+          done
+          test "$ready" -eq 1 || { echo "::error::Disposable restore database did not start"; exit 1; }
+          docker run --rm --network host \
+            -e PGPASSWORD=local_restore_only \
+            -v "$PWD/backup:/backup" postgres:17 \
+            pg_restore -h 127.0.0.1 -p 55432 -U postgres -d restore_check \
+            --no-owner --no-acl --exit-on-error /backup/model-autopsy.dump
+          docker run --rm --network host \
+            -e PGPASSWORD=local_restore_only -e CHECK_SQL \
+            postgres:17 sh -c 'psql -h 127.0.0.1 -p 55432 -U postgres -d restore_check -v ON_ERROR_STOP=1 -At -c "$CHECK_SQL"' \
+            > backup/restored-counts.txt
+          diff -u backup/source-counts.txt backup/restored-counts.txt
+          echo "All application-table row counts verified against independent restore."
+
+      - name: Encrypt the verified dump before artifact storage
+        shell: bash
+        run: |
+          set -euo pipefail
+          openssl enc -aes-256-cbc -pbkdf2 -iter 300000 -salt \
+            -in backup/model-autopsy.dump \
+            -out backup/model-autopsy.dump.enc \
+            -pass env:BACKUP_PASSPHRASE
+          test -s backup/model-autopsy.dump.enc
+          (cd backup && sha256sum model-autopsy.dump.enc > model-autopsy.dump.enc.sha256)
+          openssl enc -d -aes-256-cbc -pbkdf2 -iter 300000 \
+            -in backup/model-autopsy.dump.enc \
+            -out backup/verify-decrypted.dump \
+            -pass env:BACKUP_PASSPHRASE
+          cmp backup/model-autopsy.dump backup/verify-decrypted.dump
+          shred -u backup/model-autopsy.dump backup/verify-decrypted.dump
+          rm -f backup/restored-counts.txt
+
+      - name: Upload ENCRYPTED backup only (7-day retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: model-autopsy-supabase-encrypted-backup
+          path: |
+            backup/model-autopsy.dump.enc
+            backup/model-autopsy.dump.enc.sha256
+            backup/source-counts.txt
+          retention-days: 7
+          if-no-files-found: error

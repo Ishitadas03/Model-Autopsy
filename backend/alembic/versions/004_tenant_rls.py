@@ -123,6 +123,20 @@ def upgrade() -> None:
             f"USING ({expression})"
         )
 
+    # Supabase's automatic-RLS event trigger helper is SECURITY DEFINER.
+    # Event triggers do not need public RPC EXECUTE privileges. Restrict it
+    # from anonymous and regular authenticated PostgREST clients.
+    op.execute("""
+        DO $
+        BEGIN
+          IF to_regprocedure('public.rls_auto_enable()') IS NOT NULL THEN
+            REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()
+              FROM PUBLIC, anon, authenticated;
+          END IF;
+        END
+        $;
+    """)
+
 
 def downgrade() -> None:
     # A rollback must not leave a tenant data breach by disabling RLS.

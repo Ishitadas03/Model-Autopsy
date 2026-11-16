@@ -79,3 +79,42 @@ class TestModelEndpoints:
         assert row["taskType"] == "regression"
         assert row["predictProba"] is False
         assert row["parameters"]["n_estimators"] == 100
+
+    @pytest.mark.asyncio
+    async def test_private_model_adapters_are_not_disclosed_to_other_users(
+        self, client: AsyncClient, seed_models, test_session
+    ):
+        """A registered adapter inherits the source dataset's tenant visibility."""
+        from uuid import uuid4
+        from sqlalchemy import select
+        from app.core.auth import get_current_user
+        from app.main import app
+        from app.models.dataset import Dataset
+
+        private_owner, another_user = uuid4(), uuid4()
+        dataset = (await test_session.execute(
+            select(Dataset).where(Dataset.dataset_id == "iris")
+        )).scalar_one()
+        dataset.owner_id = private_owner
+        dataset.is_public = False
+        await test_session.flush()
+
+        try:
+            app.dependency_overrides[get_current_user] = lambda: another_user
+            foreign_list = await client.get("/api/models?dataset_id=iris")
+            assert foreign_list.status_code == 200, foreign_list.text
+            assert all(
+                model["id"] not in {"rf-iris", "lr-iris", "gb-iris"}
+                for model in foreign_list.json()
+            )
+            detail = await client.get("/api/models/rf-iris")
+            assert detail.status_code == 404
+
+            app.dependency_overrides[get_current_user] = lambda: private_owner
+            own_list = await client.get("/api/models?dataset_id=iris")
+            assert own_list.status_code == 200
+            assert any(model["id"] == "rf-iris" for model in own_list.json())
+            own_detail = await client.get("/api/models/rf-iris")
+            assert own_detail.status_code == 200
+        finally:
+            app.dependency_overrides.pop(get_current_user, None)

@@ -97,7 +97,6 @@ async def get_model(
     model = await repo.get_by_model_id(model_id)
 
     if not model:
-        from fastapi import HTTPException, status
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Model {model_id} not found",

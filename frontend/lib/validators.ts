@@ -23,9 +23,7 @@ export const Step3Schema = z.object({
 export const Step4Schema = z
   .object({
     stressType: z.enum(['gaussian_noise', 'missingness'], {
-      errorMap: () => ({
-        message: 'Only Gaussian Noise and Missingness are currently available.',
-      }),
+      error: 'Only Gaussian Noise and Missingness are currently available.',
     }),
     severityLevels: z
       .array(z.number())
@@ -59,28 +57,28 @@ export function validateStep(
     const res = Step1Schema.safeParse(config);
     return {
       isValid: res.success,
-      error: res.success ? undefined : res.error.errors[0]?.message,
+      error: res.success ? undefined : res.error.issues[0]?.message,
     };
   }
   if (step === 2) {
     const res = Step2Schema.safeParse(config);
     return {
       isValid: res.success,
-      error: res.success ? undefined : res.error.errors[0]?.message,
+      error: res.success ? undefined : res.error.issues[0]?.message,
     };
   }
   if (step === 3) {
     const res = Step3Schema.safeParse(config);
     return {
       isValid: res.success,
-      error: res.success ? undefined : res.error.errors[0]?.message,
+      error: res.success ? undefined : res.error.issues[0]?.message,
     };
   }
   if (step === 4) {
     const res = Step4Schema.safeParse(config);
     return {
       isValid: res.success,
-      error: res.success ? undefined : res.error.errors[0]?.message,
+      error: res.success ? undefined : res.error.issues[0]?.message,
     };
   }
   return { isValid: true };

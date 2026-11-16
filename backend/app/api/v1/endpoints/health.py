@@ -1,15 +1,18 @@
 """Health check and storage observability endpoints."""
 
 import asyncio
-from fastapi import APIRouter, Depends, Request
+from fastapi import APIRouter, Depends, Request, status
+from fastapi.responses import JSONResponse
 from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 try:
+    from app.core.auth import get_current_user
     from app.core.config import settings
     from app.core.database import get_session
     from app.services.storage_service import storage_service
 except ImportError:
+    from backend.app.core.auth import get_current_user
     from backend.app.core.config import settings
     from backend.app.core.database import get_session
     from backend.app.services.storage_service import storage_service
@@ -26,10 +29,9 @@ async def health_check(request: Request, session: AsyncSession = Depends(get_ses
     except Exception:
         db_status = "error"
 
+    # Public health probes must not disclose storage bucket identifiers or config.
     storage_info = {
-        "active_provider": storage_service.active_provider,
-        "is_r2_configured": storage_service.is_configured(),
-        "bucket_name": storage_service.bucket_name,
+        "configured": storage_service.is_configured(),
     }
 
     return {
@@ -41,16 +43,61 @@ async def health_check(request: Request, session: AsyncSession = Depends(get_ses
     }
 
 
+@router.get("/ready", response_model=dict)
+async def readiness(request: Request) -> JSONResponse:
+    """Deployment gate: migrated DB, authentication, durable R2 and embedded worker."""
+    checks = {
+        "database": False,
+        "authentication": False,
+        "r2_storage": False,
+        "worker": True,
+    }
+    if settings.JOB_EXECUTION_MODE == "embedded":
+        task = getattr(request.app.state, "embedded_worker_task", None)
+        checks["worker"] = task is not None and not task.done()
+    try:
+        from app.core.database import async_session_factory
+        async with async_session_factory() as session:
+            version = (await session.execute(text("SELECT version_num FROM alembic_version"))).scalar_one_or_none()
+            checks["database"] = version == "004_tenant_rls"
+    except Exception:
+        pass
+
+    checks["authentication"] = (
+        settings.APP_ENV != "production"
+        or (settings.AUTH_REQUIRED and bool(settings.SUPABASE_URL))
+    )
+    if settings.APP_ENV == "production":
+        try:
+            access = await asyncio.wait_for(
+                asyncio.to_thread(storage_service.check_bucket_access), timeout=6
+            )
+            checks["r2_storage"] = (
+                settings.STORAGE_PROVIDER == "r2"
+                and storage_service.is_configured()
+                and bool(access.get("accessible"))
+            )
+        except Exception:
+            checks["r2_storage"] = False
+    else:
+        checks["r2_storage"] = True
+
+    ready = all(checks.values())
+    return JSONResponse(
+        status_code=status.HTTP_200_OK if ready else status.HTTP_503_SERVICE_UNAVAILABLE,
+        content={"status": "ready" if ready else "not_ready", "checks": checks},
+        headers={"Cache-Control": "no-store"},
+    )
+
+
 @router.get("/storage/status", response_model=dict)
-async def storage_status() -> dict:
-    """Detailed Cloudflare R2 and local storage status verification."""
-    access_check = storage_service.check_bucket_access()
+async def storage_status(
+    user_id=Depends(get_current_user),
+) -> dict:
+    """Authenticated storage status without exposing provider internals or secrets."""
+    access_check = await asyncio.to_thread(storage_service.check_bucket_access)
     return {
-        "active_provider": storage_service.active_provider,
-        "is_r2_configured": storage_service.is_configured(),
-        "bucket_name": storage_service.bucket_name,
-        "bucket_accessible": access_check.get("accessible", False),
-        "access_details": access_check,
-        "local_datasets_dir": str(storage_service.get_local_path("datasets")),
-        "local_artifacts_dir": str(storage_service.get_local_path("experiments")),
+        "configured": storage_service.is_configured(),
+        "accessible": bool(access_check.get("accessible")),
+        "provider": storage_service.active_provider,
     }

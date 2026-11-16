@@ -51,7 +51,7 @@ class FailedSample(BaseModel):
     sample_index: int = Field(alias="sampleIndex")
     true_label: Any = Field(alias="trueLabel")
     predicted_label: Any = Field(alias="predictedLabel")
-    confidence: float
+    confidence: Optional[float] = None
     noise_level: Optional[float] = Field(default=None, alias="noiseLevel")
     severity: Optional[float] = None
     stress_type: Optional[str] = Field(default=None, alias="stressType")

@@ -32,17 +32,18 @@ class ExperimentRepository(BaseRepository[Experiment]):
         return result.scalar_one_or_none()
 
     async def get_all(
-        self, skip: int = 0, limit: int = 100, order_by: str = "created_at"
+        self, skip: int = 0, limit: int = 100, order_by: str = "created_at",
+        owner_id: Optional[UUID] = None,
     ) -> List[Experiment]:
         """Get all experiments with result and runs loaded."""
         order_column = getattr(Experiment, order_by, Experiment.created_at)
+        query = select(Experiment).options(
+            selectinload(Experiment.runs), selectinload(Experiment.result)
+        )
+        if owner_id is not None:
+            query = query.where(Experiment.owner_id == owner_id)
         result = await self.session.execute(
-            select(Experiment)
-            .options(
-                selectinload(Experiment.runs),
-                selectinload(Experiment.result),
-            )
-            .order_by(order_column.desc())
+            query.order_by(order_column.desc())
             .offset(skip)
             .limit(limit)
         )
@@ -63,17 +64,17 @@ class ExperimentRepository(BaseRepository[Experiment]):
         return result.scalar_one_or_none()
 
     async def get_by_status(
-        self, status: ExperimentStatus, skip: int = 0, limit: int = 100
+        self, status: ExperimentStatus, skip: int = 0, limit: int = 100,
+        owner_id: Optional[UUID] = None,
     ) -> List[Experiment]:
         """Get experiments by status with result and runs loaded."""
+        query = select(Experiment).options(
+            selectinload(Experiment.runs), selectinload(Experiment.result)
+        ).where(Experiment.status == status)
+        if owner_id is not None:
+            query = query.where(Experiment.owner_id == owner_id)
         result = await self.session.execute(
-            select(Experiment)
-            .options(
-                selectinload(Experiment.runs),
-                selectinload(Experiment.result),
-            )
-            .where(Experiment.status == status)
-            .order_by(Experiment.created_at.desc())
+            query.order_by(Experiment.created_at.desc())
             .offset(skip)
             .limit(limit)
         )

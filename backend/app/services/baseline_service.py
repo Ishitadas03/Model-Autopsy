@@ -1,15 +1,11 @@
 """Baseline evaluation service for Model Autopsy."""
 
-import io
-from pathlib import Path
+import asyncio
 from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 import pandas as pd
 from pydantic import BaseModel, ConfigDict, Field
 from sqlalchemy.ext.asyncio import AsyncSession
-from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.impute import SimpleImputer
 from sklearn.ensemble import (
     RandomForestClassifier,
     RandomForestRegressor,
@@ -32,7 +28,8 @@ from sklearn.metrics import (
 from app.core.logging import get_logger
 from app.repositories.dataset import DatasetRepository
 from app.services.preprocessing import prepare_holdout
-from app.services.storage_service import storage_service
+from app.services.model_limits import validate_model_params
+from app.services.dataset_loader import load_registered_csv
 
 logger = get_logger(__name__)
 
@@ -43,7 +40,7 @@ class BaselineEvaluationRequest(BaseModel):
 
     dataset_id: str = Field(alias="datasetId")
     model_id: str = Field(default="random-forest-classifier", alias="modelId")
-    task_type: Optional[str] = Field(default="classification", alias="taskType")
+    task_type: Optional[str] = Field(default=None, alias="taskType")
     test_size: float = Field(default=0.2, alias="testSize")
     seed: int = Field(default=42)
     target_name: Optional[str] = Field(default=None, alias="targetName")
@@ -85,6 +82,17 @@ class BaselineService:
             request.dataset_id, request.target_name, session
         )
 
+        return await asyncio.to_thread(self._evaluate_dataframe, request, df, detected_target, inferred_task)
+
+    def _evaluate_dataframe(
+        self, request: BaselineEvaluationRequest, df: pd.DataFrame,
+        detected_target: str, inferred_task: str,
+    ) -> BaselineEvaluationResponse:
+        # Training must not block queue heartbeats and other ASGI requests.
+        if request.task_type and request.task_type != inferred_task:
+            raise ValueError("Task type must match the registered dataset")
+        if request.target_name and request.target_name != detected_target:
+            raise ValueError("Target must match the registered dataset")
         # Resolve target and task type
         target_col = request.target_name if request.target_name and request.target_name in df.columns else detected_target
         task_type = (request.task_type or inferred_task or "classification").lower()
@@ -93,7 +101,6 @@ class BaselineService:
         if target_col not in df.columns:
             raise ValueError(f"Target column '{target_col}' does not exist in dataset '{request.dataset_id}'")
 
-        y_raw = df[target_col]
         X_raw = df.drop(columns=[target_col])
         feature_names = list(X_raw.columns)
 
@@ -179,70 +186,78 @@ class BaselineService:
         repo = DatasetRepository(session)
         db_ds = await repo.get_by_dataset_id(dataset_id)
 
-        target_col = target_name or (db_ds.target_name if db_ds else None) or "target"
+        target_col = (db_ds.target_name if db_ds else None) or "target"
         task_type = (db_ds.task_type if db_ds else None) or "classification"
 
-        # Try storage service
-        object_key = f"datasets/{dataset_id}/data.csv"
-        raw_bytes = storage_service.get_object(object_key)
-
-        if raw_bytes is None and db_ds and db_ds.metadata_:
-            storage_key = db_ds.metadata_.get("storage_key")
-            if storage_key:
-                raw_bytes = storage_service.get_object(storage_key)
-
-        if raw_bytes is not None:
-            df = pd.read_csv(io.BytesIO(raw_bytes))
-            return df, target_col, task_type
-
-        # Check local filesystem fallback paths
-        local_candidates = [
-            Path(f"data/datasets/{dataset_id}/data.csv"),
-            Path(f"data/{dataset_id}.csv"),
-            Path(f"datasets/{dataset_id}.csv"),
-        ]
-        for p in local_candidates:
-            if p.exists():
-                df = pd.read_csv(p)
-                return df, target_col, task_type
-
-        raise FileNotFoundError(
-            f"Dataset '{dataset_id}' was not found in object storage or allowed local paths"
+        metadata = db_ds.metadata_ if db_ds and db_ds.metadata_ else {}
+        df = await asyncio.to_thread(
+            load_registered_csv, dataset_id,
+            metadata.get("storage_key"), metadata.get("sha256"),
         )
+        return df, target_col, task_type
 
     def _instantiate_model(
         self, model_id: str, is_classification: bool, seed: int, params: Dict[str, Any]
     ) -> Any:
-        """Instantiate scikit-learn model with parameters."""
+        """Use only bounded supported hyperparameters; no arbitrary fallback."""
+        task = "classification" if is_classification else "regression"
+        p = validate_model_params(model_id, task, params)
         m_id = model_id.lower()
 
         if is_classification:
             if "random" in m_id or "rf" in m_id:
-                n_est = int(params.get("n_estimators", 100))
-                max_d = int(params["max_depth"]) if params.get("max_depth") else None
-                return RandomForestClassifier(n_estimators=n_est, max_depth=max_d, random_state=seed)
+                return RandomForestClassifier(
+                    n_estimators=p.get("n_estimators", 100),
+                    max_depth=p.get("max_depth"),
+                    min_samples_split=p.get("min_samples_split", 2),
+                    random_state=seed,
+                )
             if "logistic" in m_id or "lr" in m_id:
-                c_val = float(params.get("C", 1.0))
-                return LogisticRegression(C=c_val, max_iter=500, random_state=seed)
+                return LogisticRegression(
+                    C=p.get("C", 1.0), max_iter=p.get("max_iter", 500),
+                    penalty=p.get("penalty", "l2"),
+                    solver=p.get("solver", "lbfgs"),
+                    random_state=seed,
+                )
             if "gradient" in m_id or "gb" in m_id:
-                n_est = int(params.get("n_estimators", 100))
-                lr = float(params.get("learning_rate", 0.1))
-                return GradientBoostingClassifier(n_estimators=n_est, learning_rate=lr, random_state=seed)
+                return GradientBoostingClassifier(
+                    n_estimators=p.get("n_estimators", 100),
+                    learning_rate=p.get("learning_rate", 0.1),
+                    max_depth=p.get("max_depth", 3),
+                    random_state=seed,
+                )
             if "svm" in m_id or "svc" in m_id:
-                c_val = float(params.get("C", 1.0))
-                return SVC(C=c_val, probability=True, random_state=seed)
-            return RandomForestClassifier(n_estimators=100, random_state=seed)
+                return SVC(
+                    C=p.get("C", 1.0), kernel=p.get("kernel", "rbf"),
+                    gamma=p.get("gamma", "scale"),
+                    probability=True, random_state=seed,
+                )
         else:
             if "random" in m_id or "rf" in m_id:
-                return RandomForestRegressor(n_estimators=100, random_state=seed)
+                return RandomForestRegressor(
+                    n_estimators=p.get("n_estimators", 100),
+                    max_depth=p.get("max_depth"),
+                    min_samples_split=p.get("min_samples_split", 2),
+                    random_state=seed,
+                )
             if "gradient" in m_id or "gb" in m_id:
-                return GradientBoostingRegressor(n_estimators=100, random_state=seed)
+                return GradientBoostingRegressor(
+                    n_estimators=p.get("n_estimators", 100),
+                    learning_rate=p.get("learning_rate", 0.1),
+                    max_depth=p.get("max_depth", 3),
+                    random_state=seed,
+                )
             if "ridge" in m_id:
-                alpha = float(params.get("alpha", 1.0))
-                return Ridge(alpha=alpha, random_state=seed)
-            if "svm" in m_id or "svr" in m_id:
-                return SVR()
-            return LinearRegression()
+                return Ridge(alpha=p.get("alpha", 1.0), random_state=seed)
+            if "svr" in m_id or "svm" in m_id:
+                return SVR(
+                    C=p.get("C", 1.0), kernel=p.get("kernel", "rbf"),
+                    gamma=p.get("gamma", "scale"),
+                )
+            if "linear" in m_id:
+                return LinearRegression(fit_intercept=p.get("fit_intercept", True))
+
+        raise ValueError(f"Unsupported model adapter: {model_id}")
 
 
 baseline_service = BaselineService()

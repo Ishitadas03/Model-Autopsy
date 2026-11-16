@@ -55,6 +55,7 @@ class StressMode(str, enum.Enum):
     """Execution mode for stress testing."""
     INCREMENTAL = "incremental"
     RANDOM = "random"
+    FEATURE_SPECIFIC = "feature_specific"
     ADAPTIVE = "adaptive"
 
 
@@ -75,6 +76,7 @@ class Experiment(Base):
     experiment_id: Mapped[str] = mapped_column(
         String(50), unique=True, nullable=False, index=True
     )  # e.g., "EXP-0241"
+    owner_id: Mapped[Optional[uuid.UUID]] = mapped_column(UUID(as_uuid=True), nullable=True, index=True)
     model_name: Mapped[str] = mapped_column(String(200), nullable=False)
     dataset_name: Mapped[str] = mapped_column(String(200), nullable=False)
     dataset_id: Mapped[str] = mapped_column(
@@ -90,6 +92,10 @@ class Experiment(Base):
     severity_levels: Mapped[list] = mapped_column(JSON, nullable=False)  # List of severity values
     seeds: Mapped[list] = mapped_column(JSON, nullable=False)  # List of seeds for multi-seed
     config_yaml: Mapped[str] = mapped_column(Text, nullable=False)  # Full YAML config
+    execution_payload: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    lease_owner: Mapped[Optional[str]] = mapped_column(String(100), nullable=True)
+    lease_expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
+    attempt_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     status: Mapped[ExperimentStatus] = mapped_column(
         Enum(ExperimentStatus, native_enum=False), default=ExperimentStatus.QUEUED, nullable=False, index=True
     )
@@ -186,6 +192,8 @@ class ExperimentResult(Base):
     )
 
     # Baseline metrics (clean data)
+    baseline_metrics: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    worst_case_metrics: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     baseline_macro_f1: Mapped[Optional[float]] = mapped_column(nullable=True)
     baseline_accuracy: Mapped[Optional[float]] = mapped_column(nullable=True)
     baseline_per_class: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

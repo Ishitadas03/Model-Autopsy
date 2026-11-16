@@ -3,43 +3,40 @@
 import asyncio
 import hashlib
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
 from app.core.database import session_context
 from app.core.exceptions import (
     ConcurrencyLimitError,
-    ExperimentAlreadyRunningError,
-    ExperimentExecutionError,
     ExperimentNotFoundError,
     InvalidExperimentConfigError,
 )
 from app.core.logging import get_logger
 from app.models.experiment import (
     Experiment,
-    ExperimentRun,
-    ExperimentResult,
     ExperimentStatus,
     StressMode,
     StressType,
     TaskType,
 )
-from app.models.failure_sample import FailedSample
-from app.models.artifact import ArtifactManifest, ArtifactType
+from app.models.artifact import ArtifactType
 from app.repositories.experiment import (
     ExperimentRepository,
     ExperimentRunRepository,
     ExperimentResultRepository,
 )
 from app.repositories.dataset import DatasetRepository
+from app.core.auth import can_read_dataset
 from app.repositories.failure_sample import FailureSampleRepository
 from app.repositories.artifact import ArtifactRepository, ArtifactReferenceRepository
 from app.services.ml_engine_bridge import ml_engine_bridge, ProgressData
+from app.services.model_limits import validate_model_params
 from app.schemas import ExperimentRunRequest
 
 logger = get_logger(__name__)
@@ -51,6 +48,19 @@ class ExperimentService:
     # Class-level background task registry across requests
     _active_tasks: Dict[str, asyncio.Task] = {}
 
+    @staticmethod
+    def _owns_live_lease(experiment: Experiment, worker_id: str) -> bool:
+        expiry = experiment.lease_expires_at
+        if expiry is None:
+            return False
+        if expiry.tzinfo is None:
+            expiry = expiry.replace(tzinfo=timezone.utc)
+        return (
+            experiment.lease_owner == worker_id
+            and experiment.status == ExperimentStatus.RUNNING
+            and expiry > datetime.now(timezone.utc)
+        )
+
     def __init__(self, session: AsyncSession):
         self.session = session
         self.exp_repo = ExperimentRepository(session)
@@ -59,20 +69,23 @@ class ExperimentService:
         self.fail_repo = FailureSampleRepository(session)
         self.artifact_repo = ArtifactRepository(session)
 
-    async def create_experiment(self, request: ExperimentRunRequest) -> Experiment:
+    async def create_experiment(self, request: ExperimentRunRequest, owner_id: Optional[uuid.UUID] = None) -> Experiment:
         """Create and queue a new experiment."""
         # 1. Validate metric polarity and task compatibility
         self._validate_metric_polarity(request)
 
-        # 2. Check concurrency limit
-        running = await self.exp_repo.get_running_experiments()
-        if len(running) >= settings.MAX_CONCURRENT_EXPERIMENTS:
-            raise ConcurrencyLimitError(settings.MAX_CONCURRENT_EXPERIMENTS)
+        # Durable queue accepts jobs independently of current worker utilization.
+        if settings.JOB_EXECUTION_MODE == "inline":
+            running = await self.exp_repo.get_running_experiments()
+            if len(running) >= settings.MAX_CONCURRENT_EXPERIMENTS:
+                raise ConcurrencyLimitError(settings.MAX_CONCURRENT_EXPERIMENTS)
 
         # 3. Generate human-readable experiment ID (e.g., EXP-0001)
-        experiment_id = await self.exp_repo.get_next_experiment_id()
+        experiment_id = f"EXP-{uuid.uuid4().hex[:12].upper()}"
 
         # 4. Extract parameters supporting both snake_case and camelCase
+        if settings.APP_ENV == "production" and not (request.model_name or request.model_id):
+            raise InvalidExperimentConfigError("An explicit model selection is required")
         model_name = request.model_name or request.model_id or "RandomForest-v2 (Credit)"
         dataset_name = request.dataset_name or request.dataset_id
         dataset_id = request.dataset_id
@@ -87,18 +100,47 @@ class ExperimentService:
             list(request.stress_config.severity_levels) if request.stress_config
             else list(request.severity_levels or [0.0, 0.05, 0.1, 0.15, 0.2, 0.25, 0.3])
         )
-        if any(level < 0 or level > 1 for level in severity_levels):
-            raise InvalidExperimentConfigError("Severity levels must be in [0, 1]")
+        if (not severity_levels or any(
+            not isinstance(level, (int, float))
+            or not __import__("math").isfinite(level)
+            or level < 0 or level > 1
+            for level in severity_levels
+        )):
+            raise InvalidExperimentConfigError("Severity levels must be finite numbers in [0, 1]")
         if request.num_seeds is not None and request.seeds is None:
             seeds = [seed + i for i in range(request.num_seeds)]
+        elif settings.JOB_EXECUTION_MODE == "embedded" and request.seeds is None:
+            seeds = [seed]  # Default to one seed on Render Free.
+
+        if settings.JOB_EXECUTION_MODE == "embedded":
+            if len(seeds) > settings.EMBEDDED_MAX_SEEDS:
+                raise InvalidExperimentConfigError(
+                    f"Free tier allows at most {settings.EMBEDDED_MAX_SEEDS} seeds per experiment"
+                )
+            if len(severity_levels) > settings.EMBEDDED_MAX_SEVERITIES:
+                raise InvalidExperimentConfigError(
+                    f"Free tier allows at most {settings.EMBEDDED_MAX_SEVERITIES} stress levels"
+                )
+            active = (await self.session.execute(
+                select(func.count(Experiment.id)).where(
+                    Experiment.owner_id == owner_id,
+                    Experiment.status.in_([ExperimentStatus.QUEUED, ExperimentStatus.RUNNING]),
+                )
+            )).scalar_one()
+            if active >= settings.EMBEDDED_MAX_ACTIVE_JOBS_PER_USER:
+                raise ConcurrencyLimitError(settings.EMBEDDED_MAX_ACTIVE_JOBS_PER_USER)
         if request.stress_config is not None:
             pert_family = request.stress_config.type.value
         dataset_record = await DatasetRepository(self.session).get_by_dataset_id(dataset_id)
-        if dataset_record is None:
-            raise InvalidExperimentConfigError(f"Unknown dataset: {dataset_id}")
+        if not can_read_dataset(dataset_record, owner_id):
+            raise InvalidExperimentConfigError("Dataset unavailable or access denied")
         target_name = request.target_name or dataset_record.target_name
         if not target_name:
             raise InvalidExperimentConfigError("Dataset target column is missing")
+        if target_name != dataset_record.target_name:
+            raise InvalidExperimentConfigError("Target must match the registered dataset target")
+        if request.stress_mode in ("structured", "adaptive"):
+            raise InvalidExperimentConfigError("This stress mode is not supported by the generic runner")
         if request.task_type and str(request.task_type) not in (
             dataset_record.task_type, f"TaskType.{dataset_record.task_type.upper()}"
         ):
@@ -107,7 +149,14 @@ class ExperimentService:
             )
 
 
-        task_type_enum = self._to_task_type(request.task_type)
+        resolved_task_type = request.task_type or dataset_record.task_type
+        try:
+            validated_params = validate_model_params(
+                model_name, resolved_task_type, request.model_params
+            )
+        except ValueError as exc:
+            raise InvalidExperimentConfigError(str(exc)) from exc
+        task_type_enum = self._to_task_type(resolved_task_type)
         pert_enum = self._to_stress_type(pert_family)
         mode_enum = self._to_stress_mode(stress_mode)
 
@@ -126,11 +175,47 @@ class ExperimentService:
             seeds=seeds,
             seed=seed,
             stress_mode=stress_mode,
+            task_type=dataset_record.task_type,
+            target_name=target_name,
+            test_size=request.test_size,
+            model_params=validated_params,
+            target_features=list(request.stress_config.target_features or []) if request.stress_config else [],
         )
+
+        target_features = (
+            request.stress_config.target_features
+            if getattr(request, "stress_config", None) and getattr(request.stress_config, "target_features", None)
+            else []
+        )
+
+        # Request data for ML engine bridge
+        request_data = {
+            "experiment_id": experiment_id,
+            "use_generic": True,
+            "model_name": model_name,
+            "dataset_name": dataset_name,
+            "dataset_id": dataset_id,
+            "dataset_storage_key": (dataset_record.metadata_ or {}).get("storage_key"),
+            "dataset_sha256": (dataset_record.metadata_ or {}).get("sha256"),
+            "task_type": resolved_task_type,
+            "perturbation_family": pert_family,
+            "evaluation_metric": eval_metric,
+            "failure_threshold": threshold,
+            "stress_mode": stress_mode,
+            "severity_levels": severity_levels,
+            "target_features": target_features,
+            "target_column": target_name,
+            "hyperparameters": validated_params,
+            "model_type": request.model_id,
+            "test_size": request.test_size,
+            "seeds": seeds,
+        }
 
         # Create experiment record in database
         experiment = await self.exp_repo.create(
             experiment_id=experiment_id,
+            owner_id=owner_id,
+            execution_payload=request_data,
             model_name=model_name,
             dataset_name=dataset_name,
             dataset_id=dataset_id,
@@ -158,38 +243,18 @@ class ExperimentService:
                 progress_percent=0,
             )
 
-        target_features = (
-            request.stress_config.target_features
-            if getattr(request, "stress_config", None) and getattr(request.stress_config, "target_features", None)
-            else []
-        )
-
-        # Request data for ML engine bridge
-        request_data = {
-            "experiment_id": experiment_id,
-            "model_name": model_name,
-            "dataset_name": dataset_name,
-            "dataset_id": dataset_id,
-            "task_type": request.task_type or "classification",
-            "perturbation_family": pert_family,
-            "evaluation_metric": eval_metric,
-            "failure_threshold": threshold,
-            "stress_mode": stress_mode,
-            "severity_levels": severity_levels,
-            "target_features": target_features,
-            "target_column": target_name,
-            "hyperparameters": dict(request.model_params),
-            "model_type": request.model_id,
-            "test_size": request.test_size,
-            "seeds": seeds,
-        }
-
-        # Spawn background execution task
         exp_db_id = experiment.id
-        task = asyncio.create_task(
-            self._run_experiment_background(exp_db_id, experiment_type, request_data)
-        )
-        ExperimentService._active_tasks[str(exp_db_id)] = task
+        # Production jobs are claimed by a separate database-leased worker.
+        # No in-process task may run before the request transaction commits.
+        if settings.JOB_EXECUTION_MODE == "inline":
+            if settings.APP_ENV == "production":
+                raise InvalidExperimentConfigError("Inline experiment execution is forbidden in production")
+            await self.session.commit()
+            exp_db_id = experiment.id
+            task = asyncio.create_task(
+                self._run_experiment_background(exp_db_id, experiment_type, request_data)
+            )
+            ExperimentService._active_tasks[str(exp_db_id)] = task
 
         logger.info(
             "Experiment created and queued",
@@ -221,12 +286,15 @@ class ExperimentService:
             )
 
         # Verify failure threshold boundaries
-        if metric in higher_better and request.failure_threshold is not None:
+        if metric in higher_better - {"r2"} and request.failure_threshold is not None:
             if request.failure_threshold < 0.0 or request.failure_threshold > 1.0:
                 raise InvalidExperimentConfigError(
                     f"Failure threshold for higher-is-better metric '{metric}' must be between 0.0 and 1.0."
                 )
 
+        if metric == "r2" and request.failure_threshold is not None:
+            if request.failure_threshold > 1.0:
+                raise InvalidExperimentConfigError("R² threshold cannot exceed 1.0")
         if metric in lower_better and request.failure_threshold is not None:
             if request.failure_threshold < 0.0:
                 raise InvalidExperimentConfigError(
@@ -238,8 +306,8 @@ class ExperimentService:
             return TaskType.CLASSIFICATION
         try:
             return TaskType(val.lower())
-        except (ValueError, AttributeError):
-            return TaskType.CLASSIFICATION
+        except (ValueError, AttributeError) as exc:
+            raise InvalidExperimentConfigError(f"Invalid task type: {val}") from exc
 
     def _to_stress_type(self, val: Optional[str]) -> StressType:
         if not val:
@@ -257,8 +325,8 @@ class ExperimentService:
             return StressType.COVARIATE_SHIFT
         try:
             return StressType(v)
-        except (ValueError, AttributeError):
-            return StressType.GAUSSIAN_NOISE
+        except (ValueError, AttributeError) as exc:
+            raise InvalidExperimentConfigError(f"Unsupported stress type: {val}") from exc
 
     def _to_stress_mode(self, val: Optional[str]) -> StressMode:
         if not val:
@@ -288,7 +356,9 @@ class ExperimentService:
             "covariate_shift": "e006",
             "distribution_shift": "e006",
         }
-        return mapping.get(val, "e001")
+        if val not in mapping:
+            raise InvalidExperimentConfigError(f"Unsupported experiment protocol: {val}")
+        return mapping[val]
 
     def _generate_config_yaml(
         self,
@@ -303,26 +373,34 @@ class ExperimentService:
         seeds: List[int],
         seed: int,
         stress_mode: str,
+        task_type: str,
+        target_name: str,
+        test_size: float,
+        model_params: Dict[str, Any],
+        target_features: List[str],
     ) -> str:
-        """Generate YAML config for the experiment."""
+        """Generate the manifest from the actual selected configuration."""
         import yaml
 
         config = {
             "experiment": {
                 "name": experiment_id,
+                "task_type": task_type,
                 "model": {
                     "name": model_name,
-                    "type": "sklearn_rf",
-                    "hyperparameters": {"n_estimators": 100, "random_state": seed},
+                    "hyperparameters": model_params,
                 },
                 "dataset": {
                     "name": dataset_name,
                     "id": dataset_id,
+                    "target_column": target_name,
+                    "test_size": test_size,
                 },
                 "stress_test": {
                     "perturbation_family": perturbation_family,
                     "severity_levels": severity_levels,
                     "stress_mode": stress_mode,
+                    "target_features": target_features,
                 },
                 "evaluation": {
                     "metric": evaluation_metric,
@@ -338,16 +416,21 @@ class ExperimentService:
         return yaml.dump(config, default_flow_style=False)
 
     async def _run_experiment_background(
-        self, experiment_db_id: uuid.UUID, experiment_type: str, request_data: Dict[str, Any]
+        self, experiment_db_id: uuid.UUID, experiment_type: str, request_data: Dict[str, Any],
+        expected_lease_owner: Optional[str] = None,
     ) -> None:
         """Isolated background runner with dedicated database session."""
         try:
             async with session_context() as session:
-                exp_repo = ExperimentRepository(session)
                 run_repo = ExperimentRunRepository(session)
 
-                experiment = await exp_repo.get_by_id(experiment_db_id)
+                experiment = await session.get(Experiment, experiment_db_id, with_for_update=True)
                 if not experiment:
+                    return
+                if expected_lease_owner and not self._owns_live_lease(experiment, expected_lease_owner):
+                    logger.warning("Worker lost lease before start", experiment_id=request_data["experiment_id"])
+                    return
+                if experiment.status == ExperimentStatus.CANCELLED:
                     return
 
                 experiment.status = ExperimentStatus.RUNNING
@@ -365,10 +448,11 @@ class ExperimentService:
             async def progress_callback(progress: ProgressData):
                 try:
                     async with session_context() as prog_session:
-                        p_exp_repo = ExperimentRepository(prog_session)
                         p_run_repo = ExperimentRunRepository(prog_session)
-                        p_exp = await p_exp_repo.get_by_id(experiment_db_id)
-                        if p_exp:
+                        p_exp = await prog_session.get(Experiment, experiment_db_id, with_for_update=True)
+                        if p_exp and (
+                            expected_lease_owner is None or self._owns_live_lease(p_exp, expected_lease_owner)
+                        ):
                             p_exp.progress_percent = progress.progress
                             p_exp.current_seed_index = progress.seed_index
                             p_exp.current_severity_index = progress.severity_index
@@ -394,6 +478,12 @@ class ExperimentService:
 
             # Store completed results, artifacts, and failed samples
             async with session_context() as finish_session:
+                # Do not persist results when cancelled, expired, or claimed elsewhere.
+                finish_exp = await finish_session.get(Experiment, experiment_db_id, with_for_update=True)
+                if not finish_exp or finish_exp.status != ExperimentStatus.RUNNING:
+                    raise asyncio.CancelledError()
+                if expected_lease_owner and not self._owns_live_lease(finish_exp, expected_lease_owner):
+                    raise asyncio.CancelledError()
                 await self._process_and_save_results(finish_session, experiment_db_id, result_data)
 
                 f_exp_repo = ExperimentRepository(finish_session)
@@ -417,13 +507,18 @@ class ExperimentService:
 
         except asyncio.CancelledError:
             logger.info("Experiment run cancelled in background", db_id=str(experiment_db_id))
-            async with session_context() as cancel_session:
-                await self._mark_experiment_cancelled(cancel_session, experiment_db_id)
+            # The durable worker owns timeout/shutdown/lease-loss semantics.
+            # A cancelled asyncio task is not necessarily a user cancellation.
+            if expected_lease_owner is None:
+                async with session_context() as cancel_session:
+                    await self._mark_experiment_cancelled(cancel_session, experiment_db_id)
             raise
         except Exception as e:
             logger.exception("Experiment run failed in background", db_id=str(experiment_db_id))
             async with session_context() as fail_session:
-                await self._mark_experiment_failed(fail_session, experiment_db_id, str(e))
+                await self._mark_experiment_failed(
+                    fail_session, experiment_db_id, str(e), expected_lease_owner,
+                )
         finally:
             ExperimentService._active_tasks.pop(str(experiment_db_id), None)
 
@@ -447,6 +542,8 @@ class ExperimentService:
         # Create or update ExperimentResult
         await result_repo.create(
             experiment_id=experiment_db_id,
+            baseline_metrics=results.get("baseline_metrics"),
+            worst_case_metrics=results.get("worst_case_metrics"),
             baseline_macro_f1=results.get("baseline_macro_f1"),
             baseline_accuracy=results.get("baseline_accuracy"),
             worst_case_macro_f1=results.get("worst_case_macro_f1"),
@@ -525,7 +622,7 @@ class ExperimentService:
                 sample_id=s.get("sample_id", "samp-0"),
                 true_label=str(s.get("true_label", "")),
                 predicted_label=str(s.get("predicted_label", "")),
-                confidence=float(s.get("confidence", 0.0)),
+                confidence=(float(s["confidence"]) if s.get("confidence") is not None else None),
                 noise_level=float(s.get("noise_level", 0.0)),
                 seed=int(s.get("seed", 42)),
                 features_clean=s.get("features_clean", {}),
@@ -556,13 +653,15 @@ class ExperimentService:
         return "application/octet-stream"
 
     async def _mark_experiment_cancelled(self, session: AsyncSession, experiment_db_id: uuid.UUID) -> None:
-        exp_repo = ExperimentRepository(session)
         run_repo = ExperimentRunRepository(session)
 
-        exp = await exp_repo.get_by_id(experiment_db_id)
-        if exp:
-            exp.status = ExperimentStatus.CANCELLED
-            exp.completed_at = datetime.utcnow()
+        exp = await session.get(
+            Experiment, experiment_db_id, with_for_update=True, populate_existing=True,
+        )
+        if not exp or exp.status in (ExperimentStatus.FAILED, ExperimentStatus.COMPLETED):
+            return
+        exp.status = ExperimentStatus.CANCELLED
+        exp.completed_at = datetime.utcnow()
 
         runs = await run_repo.get_by_experiment(experiment_db_id)
         for r in runs:
@@ -572,16 +671,23 @@ class ExperimentService:
         await session.flush()
 
     async def _mark_experiment_failed(
-        self, session: AsyncSession, experiment_db_id: uuid.UUID, error_message: str
+        self, session: AsyncSession, experiment_db_id: uuid.UUID, error_message: str,
+        expected_lease_owner: Optional[str] = None,
     ) -> None:
-        exp_repo = ExperimentRepository(session)
         run_repo = ExperimentRunRepository(session)
 
-        exp = await exp_repo.get_by_id(experiment_db_id)
-        if exp:
-            exp.status = ExperimentStatus.FAILED
-            exp.error_message = error_message
-            exp.completed_at = datetime.utcnow()
+        exp = await session.get(
+            Experiment, experiment_db_id, with_for_update=True, populate_existing=True,
+        )
+        if not exp or exp.status in (
+            ExperimentStatus.CANCELLED, ExperimentStatus.COMPLETED, ExperimentStatus.FAILED,
+        ):
+            return
+        if expected_lease_owner is not None and exp.lease_owner != expected_lease_owner:
+            return
+        exp.status = ExperimentStatus.FAILED
+        exp.error_message = error_message
+        exp.completed_at = datetime.utcnow()
 
         runs = await run_repo.get_by_experiment(experiment_db_id)
         for r in runs:
@@ -593,11 +699,31 @@ class ExperimentService:
 
     async def cancel_experiment(self, experiment_db_id: uuid.UUID) -> Dict[str, Any]:
         """Cancel a running or queued experiment."""
-        experiment = await self.exp_repo.get_by_id(experiment_db_id)
+        experiment = await self.session.get(
+            Experiment, experiment_db_id, with_for_update=True, populate_existing=True,
+        )
         if not experiment:
             raise ExperimentNotFoundError(str(experiment_db_id))
+        if experiment.status in (ExperimentStatus.COMPLETED, ExperimentStatus.FAILED):
+            raise InvalidExperimentConfigError(
+                "A completed or failed experiment cannot be cancelled"
+            )
+        if experiment.status == ExperimentStatus.CANCELLED:
+            return {
+                "success": True,
+                "experimentId": experiment.experiment_id,
+                "status": "cancelled",
+                "terminatedPid": None,
+                "confirmedStopped": None,
+            }
 
-        # Cancel bridge subprocess if active
+        # Commit the cancellation before stopping compute. Otherwise the runner
+        # can observe the killed subprocess and win a race to mark it FAILED.
+        await self._mark_experiment_cancelled(self.session, experiment_db_id)
+        await self.session.commit()
+
+        # Cancel bridge subprocess if active in this process. Remote workers
+        # observe the durable cancellation on their next heartbeat.
         bridge_res = await ml_engine_bridge.cancel_experiment(experiment.experiment_id)
 
         # Cancel async task if active
@@ -608,9 +734,6 @@ class ExperimentService:
                 await task
             except asyncio.CancelledError:
                 pass
-
-        # Update DB status
-        await self._mark_experiment_cancelled(self.session, experiment_db_id)
 
         return {
             "success": True,

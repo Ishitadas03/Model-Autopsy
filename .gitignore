@@ -98,3 +98,9 @@ temp/
 /*.mp4
 /*.mov
 /*.avi
+
+# Never commit database backups or private production exports.
+/backups/
+*.dump
+*.backup
+*.sql.gz

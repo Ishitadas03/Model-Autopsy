@@ -38,17 +38,53 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     setup_logging()
     logger.info("Starting Model Autopsy API", version=settings.APP_VERSION)
 
-    # Initialize database
+    # The free Render web instance has no separate always-on worker.
+    # Spawn one durable polling task ONLY when the current DB schema is ready.
+    database_ready = False
+    worker_shutdown = None
+    worker_task = None
     try:
-        await asyncio.wait_for(init_db(), timeout=1.5)
-        logger.info("Database initialized")
+        await asyncio.wait_for(init_db(), timeout=10.0)
+        database_ready = True
+        logger.info("Database initialized and schema checked")
     except Exception as e:
-        logger.warning(f"Database initialization deferred (database not ready): {e}")
+        logger.error("Database not ready; experiment worker will not start: %s", e)
 
-    yield
+    app.state.embedded_worker_task = None
+    if settings.JOB_EXECUTION_MODE == "embedded":
+        if database_ready:
+            from app.workers.experiment_worker import serve_jobs
+            worker_shutdown = asyncio.Event()
+            worker_task = asyncio.create_task(
+                serve_jobs(worker_shutdown),
+                name="embedded-durable-ml-queue",
+            )
+            app.state.embedded_worker_task = worker_task
+            logger.warning(
+                "Embedded free-tier worker active: jobs may be interrupted "
+                "by Render spin-down or instance restart"
+            )
+        else:
+            logger.error("Embedded worker disabled until database migrations complete")
 
-    # Shutdown
-    logger.info("Shutting down Model Autopsy API")
+    try:
+        yield
+    finally:
+        # Stop claiming jobs before the process shuts down. A cancellation
+        # terminates the child process; status remains durable in PostgreSQL.
+        if worker_shutdown is not None:
+            worker_shutdown.set()
+        if worker_task is not None:
+            try:
+                await asyncio.wait_for(worker_task, timeout=8.0)
+            except asyncio.TimeoutError:
+                worker_task.cancel()
+                await asyncio.gather(worker_task, return_exceptions=True)
+            except asyncio.CancelledError:
+                worker_task.cancel()
+                await asyncio.gather(worker_task, return_exceptions=True)
+
+        logger.info("Shutting down Model Autopsy API")
     try:
         await asyncio.wait_for(close_db(), timeout=1.0)
         logger.info("Database connections closed")

@@ -52,6 +52,7 @@ for p in [str(ML_ENGINE_SRC), str(BACKEND_DIR)]:
         sys.path.insert(0, p)
 
 from app.services.preprocessing import prepare_holdout
+from app.services.model_limits import validate_model_params
 
 
 def compute_sha256(path: Path) -> str:
@@ -67,8 +68,8 @@ def compute_sha256(path: Path) -> str:
 
 def load_dataset_from_config(config: Dict[str, Any]) -> Tuple[pd.DataFrame, str, str]:
     """Load dataframe from config path, storage, or benchmark."""
-    ds_cfg = config.get("dataset", {})
-    ds_id = str(ds_cfg.get("id", "")).strip().lower()
+    ds_cfg = config.get("experiment", {}).get("dataset", {})
+    ds_id = str(ds_cfg.get("id", "")).strip()
     ds_path = ds_cfg.get("path")
     target_name = ds_cfg.get("target_column") or ds_cfg.get("target_name")
     task_type = (config.get("experiment", {}).get("task_type") or "classification").lower()
@@ -79,49 +80,21 @@ def load_dataset_from_config(config: Dict[str, Any]) -> Tuple[pd.DataFrame, str,
         return df, target_name or df.columns[-1], task_type
 
     # 2. Benchmark fallbacks
-    if ds_id in ("iris", "iris-dataset", "fisher-iris"):
+    if ds_id.lower() in ("iris", "iris-dataset", "fisher-iris"):
         from sklearn.datasets import load_iris
         raw = load_iris(as_frame=True)
         return raw.frame, "target", "classification"
 
-    if ds_id in ("credit-risk-demo", "german-credit", "german_credit"):
-        # Look for local csv in data/
-        for p in [
-            REPO_ROOT / "data" / "german_credit.csv",
-            REPO_ROOT / "data" / "credit-risk-demo.csv",
-            REPO_ROOT / "data" / f"{ds_id}.csv",
-        ]:
-            if p.exists():
-                df = pd.read_csv(p)
-                return df, target_name or df.columns[-1], task_type
-
-    # 3. Check artifacts/datasets/
-    for p in [
-        REPO_ROOT / "artifacts" / "datasets" / ds_id / "data.csv",
-        REPO_ROOT / "data" / f"{ds_id}.csv",
-    ]:
-        if p.exists():
-            df = pd.read_csv(p)
-            return df, target_name or df.columns[-1], task_type
-
-    # 4. Storage service lookup
-    try:
-        from app.services.storage_service import storage_service
-        raw_bytes = storage_service.get_object(f"datasets/{ds_id}/data.csv")
-        if raw_bytes:
-            import io
-            df = pd.read_csv(io.BytesIO(raw_bytes))
-            return df, target_name or df.columns[-1], task_type
-    except Exception:
-        pass
-
-    raise FileNotFoundError(
-        f"Dataset '{ds_id}' is unavailable; refusing to evaluate synthetic replacement data"
-    )
+    # Use the same registered object and checksum as the baseline. Never
+    # silently select an unrelated local file when durable storage is required.
+    from app.services.dataset_loader import load_registered_csv
+    df = load_registered_csv(ds_id, ds_cfg.get("storage_key"), ds_cfg.get("sha256"))
+    return df, target_name or df.columns[-1], task_type
 
 
 def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[str, Any]):
-    """Instantiate model adapter."""
+    """Instantiate a resource-bounded, explicitly supported model adapter."""
+    params = validate_model_params(model_name, task_type, params)
     is_classification = task_type == "classification"
     m_name = (model_name or "").lower()
 
@@ -129,33 +102,37 @@ def instantiate_model(model_name: str, task_type: str, seed: int, params: Dict[s
         if "logistic" in m_name:
             c = float(params.get("C", 1.0))
             max_iter = int(params.get("max_iter", 1000))
-            return LogisticRegression(C=c, max_iter=max_iter, random_state=seed)
+            return LogisticRegression(C=c, max_iter=max_iter, penalty=params.get("penalty", "l2"), solver=params.get("solver", "lbfgs"), random_state=seed)
         elif "gradient" in m_name or "gbm" in m_name:
             n_est = int(params.get("n_estimators", 100))
             lr = float(params.get("learning_rate", 0.1))
-            return GradientBoostingClassifier(n_estimators=n_est, learning_rate=lr, random_state=seed)
+            return GradientBoostingClassifier(n_estimators=n_est, learning_rate=lr, max_depth=params.get("max_depth", 3), random_state=seed)
         elif "svc" in m_name or "svm" in m_name:
             c = float(params.get("C", 1.0))
-            return SVC(C=c, probability=True, random_state=seed)
-        else:
+            return SVC(C=c, kernel=params.get("kernel", "rbf"), gamma=params.get("gamma", "scale"), probability=True, random_state=seed)
+        elif "random" in m_name or "rf" in m_name:
             n_est = int(params.get("n_estimators", 100))
             max_d = int(params.get("max_depth")) if params.get("max_depth") else None
-            return RandomForestClassifier(n_estimators=n_est, max_depth=max_d, random_state=seed)
+            return RandomForestClassifier(n_estimators=n_est, max_depth=max_d, min_samples_split=params.get("min_samples_split", 2), random_state=seed)
+        else:
+            raise ValueError(f"Unsupported classifier adapter: {model_name}")
     else:
         if "ridge" in m_name:
             alpha = float(params.get("alpha", 1.0))
             return Ridge(alpha=alpha, random_state=seed)
         elif "linear" in m_name:
-            return LinearRegression()
+            return LinearRegression(fit_intercept=params.get("fit_intercept", True))
         elif "gradient" in m_name:
             n_est = int(params.get("n_estimators", 100))
-            return GradientBoostingRegressor(n_estimators=n_est, random_state=seed)
+            return GradientBoostingRegressor(n_estimators=n_est, learning_rate=params.get("learning_rate", 0.1), max_depth=params.get("max_depth", 3), random_state=seed)
         elif "svr" in m_name:
-            return SVR()
-        else:
+            return SVR(C=params.get("C", 1.0), kernel=params.get("kernel", "rbf"), gamma=params.get("gamma", "scale"))
+        elif "random" in m_name or "rf" in m_name:
             n_est = int(params.get("n_estimators", 100))
             max_d = int(params.get("max_depth")) if params.get("max_depth") else None
-            return RandomForestRegressor(n_estimators=n_est, max_depth=max_d, random_state=seed)
+            return RandomForestRegressor(n_estimators=n_est, max_depth=max_d, min_samples_split=params.get("min_samples_split", 2), random_state=seed)
+        else:
+            raise ValueError(f"Unsupported regressor adapter: {model_name}")
 
 
 def apply_stress_perturbation(
@@ -165,6 +142,7 @@ def apply_stress_perturbation(
     severity: float,
     seed: int,
     target_indices: Optional[List[int]] = None,
+    train_medians: Optional[np.ndarray] = None,
 ) -> np.ndarray:
     """Apply calibrated perturbation to test features."""
     if severity <= 0.0:
@@ -182,8 +160,9 @@ def apply_stress_perturbation(
         for j in indices:
             mask = rng.rand(n_rows) < severity
             if np.any(mask):
-                median_val = np.median(X_pert[~mask, j]) if np.any(~mask) else 0.0
-                X_pert[mask, j] = median_val
+                if train_medians is None:
+                    raise ValueError("Training medians are required for MCAR imputation")
+                X_pert[mask, j] = train_medians[j]
     elif "outlier" in st:
         for j in indices:
             mask = rng.rand(n_rows) < severity
@@ -228,6 +207,17 @@ def main() -> int:
     stress_type = stress_cfg.get("perturbation_family", "gaussian_noise")
     severities = stress_cfg.get("severity_levels", [0.0, 0.05, 0.10, 0.15, 0.20, 0.25, 0.30])
     target_features = stress_cfg.get("target_features", [])
+    supported_stresses = {"gaussian_noise", "missingness", "outliers", "covariate_shift"}
+    if stress_type not in supported_stresses:
+        raise ValueError(
+            f"Stress protocol {stress_type!r} is not implemented by the generic runner; "
+            "refusing to substitute Gaussian noise."
+        )
+    if not isinstance(severities, list) or not severities or any(
+        not isinstance(v, (int, float)) or not np.isfinite(v) or v < 0 or v > 1
+        for v in severities
+    ):
+        raise ValueError("Severity grid must be a non-empty list of finite values in [0, 1]")
 
     eval_cfg = exp_cfg.get("evaluation", {})
     metric_name = (eval_cfg.get("metric") or "f1").lower()
@@ -245,11 +235,32 @@ def main() -> int:
     if task_type not in ("classification", "regression"):
         raise ValueError(f"Unsupported task type: {task_type}")
     is_classification = task_type == "classification"
+    supported_metrics = (
+        {"f1", "accuracy", "precision", "recall"}
+        if is_classification else {"r2", "mae", "rmse"}
+    )
+    if metric_name not in supported_metrics:
+        raise ValueError(
+            f"Metric {metric_name!r} is incompatible with {task_type}; "
+            f"choose from {sorted(supported_metrics)}"
+        )
+    if not np.isfinite(failure_threshold):
+        raise ValueError("Failure threshold must be finite")
+    if metric_name in {"f1", "accuracy", "precision", "recall"} and not (0 <= failure_threshold <= 1):
+        raise ValueError("Classification metric threshold must be in [0, 1]")
 
     if target_col not in df.columns:
         raise ValueError(f"Target column {target_col!r} not found in dataset")
 
     feature_names = list(df.drop(columns=[target_col]).columns)
+    missing_features = sorted(set(target_features) - set(feature_names))
+    if missing_features:
+        raise ValueError(f"Unknown stress features: {missing_features}")
+    numeric_features = set(df.drop(columns=[target_col]).select_dtypes(include=[np.number]).columns)
+    if target_features and set(target_features) - numeric_features:
+        raise ValueError("Selected stress features must be numeric")
+    if not numeric_features:
+        raise ValueError("Generic perturbations require at least one numeric feature")
 
     # Multi-seed loop
     per_seed_records: Dict[int, List[Dict[str, Any]]] = {}
@@ -260,6 +271,7 @@ def main() -> int:
 
     base_f1s = []
     base_accs = []
+    baseline_primary_scores = []
     feature_vuln_accs: Dict[str, List[float]] = {f: [] for f in feature_names}
 
     for s_idx, seed in enumerate(seeds):
@@ -269,16 +281,17 @@ def main() -> int:
         # Each seed gets an independent split with train-only fitted preprocessing.
         X_train, X_test, y_train, y_test, classes, feature_names = prepare_holdout(
             df, target_col, task_type,
-            test_size=float(config.get("dataset", {}).get("test_size", 0.20)),
+            test_size=float(config.get("experiment", {}).get("dataset", {}).get("test_size", 0.20)),
             seed=seed,
         )
-        target_feature_indices = [
-            feature_names.index(feature)
-            for feature in target_features if feature in feature_names
+        eligible_features = target_features or [
+            feature for feature in feature_names if feature in numeric_features
         ]
+        target_feature_indices = [feature_names.index(feature) for feature in eligible_features]
 
         train_std = np.std(X_train, axis=0)
         train_std[train_std == 0.0] = 1.0
+        train_medians = np.median(X_train, axis=0)
 
         # Fit model
         model = instantiate_model(model_name, task_type, seed, hyperparams)
@@ -291,11 +304,21 @@ def main() -> int:
             b_acc = float(accuracy_score(y_test, base_preds))
             base_f1s.append(b_f1)
             base_accs.append(b_acc)
+            baseline_primary_scores.append({
+                "f1": b_f1, "accuracy": b_acc,
+                "precision": float(precision_score(y_test, base_preds, average="macro", zero_division=0)),
+                "recall": float(recall_score(y_test, base_preds, average="macro", zero_division=0)),
+            }[metric_name])
         else:
-            b_f1 = float(r2_score(y_test, base_preds))
-            b_acc = float(mean_absolute_error(y_test, base_preds))
+            b_f1 = float(r2_score(y_test, base_preds))  # R2; never serialize as F1
+            b_acc = float(mean_absolute_error(y_test, base_preds))  # MAE
             base_f1s.append(b_f1)
             base_accs.append(b_acc)
+            baseline_primary_scores.append({
+                "r2": b_f1,
+                "mae": b_acc,
+                "rmse": float(np.sqrt(mean_squared_error(y_test, base_preds))),
+            }[metric_name])
 
         # Severity sweep
         seed_records = []
@@ -316,6 +339,7 @@ def main() -> int:
             X_stressed = apply_stress_perturbation(
                 X_test, train_std, stress_type, sev, seed=seed + int(sev * 1000),
                 target_indices=target_feature_indices,
+                train_medians=train_medians,
             )
 
             preds = model.predict(X_stressed)
@@ -325,33 +349,36 @@ def main() -> int:
                 m_acc = float(accuracy_score(y_test, preds))
                 m_prec = float(precision_score(y_test, preds, average="macro", zero_division=0))
                 m_rec = float(recall_score(y_test, preds, average="macro", zero_division=0))
-                cm = confusion_matrix(y_test, preds).tolist()
-                eval_metric_val = m_f1 if "f1" in metric_name else m_acc
-                is_failed = eval_metric_val < failure_threshold
+                metric_values = {
+                    "f1": m_f1, "accuracy": m_acc,
+                    "precision": m_prec, "recall": m_rec,
+                }
             else:
                 m_f1 = float(r2_score(y_test, preds))
                 m_acc = float(mean_absolute_error(y_test, preds))
-                m_prec = 0.0
-                m_rec = 0.0
-                cm = []
-                eval_metric_val = m_f1 if "r2" in metric_name else m_acc
-                is_failed = eval_metric_val < failure_threshold if "r2" in metric_name else eval_metric_val > failure_threshold
+                m_rmse = float(np.sqrt(mean_squared_error(y_test, preds)))
+                metric_values = {"r2": m_f1, "mae": m_acc, "rmse": m_rmse}
+            eval_metric_val = metric_values[metric_name]
+            is_failed = (
+                eval_metric_val > failure_threshold
+                if metric_name in {"mae", "rmse"} else eval_metric_val < failure_threshold
+            )
 
             if is_failed and observed_bound is None:
                 observed_bound = sev
 
             record = {
                 "severity": sev,
-                "macro_f1": round(m_f1, 4),
-                "accuracy": round(m_acc, 4),
-                "precision": round(m_prec, 4),
-                "recall": round(m_rec, 4),
+                **{name: round(value, 6) for name, value in metric_values.items()},
+                "score": round(eval_metric_val, 6),
                 "is_failed": is_failed,
             }
             seed_records.append(record)
 
-            # Collect failed samples at higher severity
-            if sev >= 0.15 and len(all_failed_samples) < 50:
+            # Persist only observed classification errors, never fabricated confidence.
+            # Regression residuals need a separately defined sample-level tolerance.
+            if is_classification and sev >= 0.15 and len(all_failed_samples) < 50:
+                probabilities = model.predict_proba(X_stressed) if hasattr(model, "predict_proba") else None
                 diff_mask = preds != y_test
                 diff_indices = np.where(diff_mask)[0]
                 for idx in diff_indices[:5]:
@@ -360,7 +387,10 @@ def main() -> int:
                         "sample_id": f"samp-{seed}-{sev}-{idx}",
                         "true_label": str(classes[y_test[idx]]) if is_classification and classes else str(y_test[idx]),
                         "predicted_label": str(classes[preds[idx]]) if is_classification and classes else str(preds[idx]),
-                        "confidence": 0.85,
+                        "confidence": (
+                            float(probabilities[idx, int(np.where(model.classes_ == preds[idx])[0][0])])
+                            if probabilities is not None else None
+                        ),
                         "noise_level": float(sev),
                         "seed": seed,
                         "features_clean": {feature_names[j]: round(float(X_test[idx, j]), 4) for j in range(min(8, len(feature_names)))},
@@ -376,86 +406,157 @@ def main() -> int:
             noise = np.random.RandomState(seed + j).normal(0.0, 0.20 * train_std[j], size=len(X_test))
             X_single[:, j] += noise
             single_preds = model.predict(X_single)
-            score = float(f1_score(y_test, single_preds, average="macro", zero_division=0)) if is_classification else float(r2_score(y_test, single_preds))
-            drop = max(0.0, b_f1 - score)
+            if is_classification:
+                scored = {
+                    "f1": float(f1_score(y_test, single_preds, average="macro", zero_division=0)),
+                    "accuracy": float(accuracy_score(y_test, single_preds)),
+                    "precision": float(precision_score(y_test, single_preds, average="macro", zero_division=0)),
+                    "recall": float(recall_score(y_test, single_preds, average="macro", zero_division=0)),
+                }
+            else:
+                scored = {
+                    "r2": float(r2_score(y_test, single_preds)),
+                    "mae": float(mean_absolute_error(y_test, single_preds)),
+                    "rmse": float(np.sqrt(mean_squared_error(y_test, single_preds))),
+                }
+            score = scored[metric_name]
+            clean_score = baseline_primary_scores[s_idx]
+            drop = max(
+                0.0, score - clean_score
+                if metric_name in {"mae", "rmse"} else clean_score - score
+            )
             feature_vuln_accs[fname].append(drop)
 
-    # Multi-seed Statistical Aggregation
+    # Multi-seed Statistical Aggregation — metric names and polarity are explicit.
+    def summarize(values: List[float]) -> Dict[str, Any]:
+        vals = np.asarray(values, dtype=float)
+        mean = float(np.mean(vals))
+        sem = float(stats.sem(vals)) if len(vals) > 1 else None
+        interval = None
+        if sem is not None and np.isfinite(sem):
+            critical = float(stats.t.ppf(0.975, len(vals) - 1))
+            interval = [
+                round(mean - critical * sem, 6),
+                round(mean + critical * sem, 6),
+            ]
+        return {
+            "mean": round(mean, 6),
+            "sem": round(sem, 6) if sem is not None else None,
+            "ci_95": interval,
+            "n": len(vals),
+        }
+
+    metric_keys = (
+        ["f1", "accuracy", "precision", "recall"]
+        if is_classification else ["r2", "mae", "rmse"]
+    )
     severity_aggregates = []
     curve_data = []
+    lower_is_better = metric_name in {"mae", "rmse"}
 
     for sev_idx, sev in enumerate(severities):
-        f1_vals = [per_seed_records[s][sev_idx]["macro_f1"] for s in seeds]
-        acc_vals = [per_seed_records[s][sev_idx]["accuracy"] for s in seeds]
-
-        f1_mean = float(np.mean(f1_vals))
-        f1_sem = float(stats.sem(f1_vals)) if len(seeds) > 1 else 0.0
-        acc_mean = float(np.mean(acc_vals))
-        acc_sem = float(stats.sem(acc_vals)) if len(seeds) > 1 else 0.0
-
-        ci_f1 = (f1_mean - 1.96 * f1_sem, f1_mean + 1.96 * f1_sem)
-        ci_acc = (acc_mean - 1.96 * acc_sem, acc_mean + 1.96 * acc_sem)
-
+        all_metrics = {
+            key: summarize([per_seed_records[seed][sev_idx][key] for seed in seeds])
+            for key in metric_keys
+        }
+        primary = all_metrics[metric_name]
+        is_failed = (
+            primary["mean"] > failure_threshold
+            if lower_is_better else primary["mean"] < failure_threshold
+        )
         severity_aggregates.append({
             "severity": sev,
-            "macro_f1": {"mean": round(f1_mean, 4), "sem": round(f1_sem, 4), "ci_95": [round(ci_f1[0], 4), round(ci_f1[1], 4)]},
-            "accuracy": {"mean": round(acc_mean, 4), "sem": round(acc_sem, 4), "ci_95": [round(ci_acc[0], 4), round(ci_acc[1], 4)]},
-            "is_failed": f1_mean < failure_threshold,
+            "metric": metric_name,
+            "score": primary,
+            "metrics": all_metrics,
+            "is_failed": is_failed,
+            **({"macro_f1": all_metrics["f1"], "accuracy": all_metrics["accuracy"]}
+               if is_classification else {
+                   "r2": all_metrics["r2"], "mae": all_metrics["mae"], "rmse": all_metrics["rmse"]
+               }),
         })
-
         curve_data.append({
             "severity": sev,
-            "mean_macro_f1": round(f1_mean, 4),
-            "sem_macro_f1": round(f1_sem, 4),
-            "ci_lower": round(ci_f1[0], 4),
-            "ci_upper": round(ci_f1[1], 4),
-            "mean_accuracy": round(acc_mean, 4),
-            "sem_accuracy": round(acc_sem, 4),
+            "metric": metric_name,
+            "mean_score": primary["mean"],
+            "sem_score": primary["sem"],
+            "ci_lower": primary["ci_95"][0] if primary["ci_95"] else None,
+            "ci_upper": primary["ci_95"][1] if primary["ci_95"] else None,
+            **({
+                "mean_macro_f1": all_metrics["f1"]["mean"],
+                "mean_accuracy": all_metrics["accuracy"]["mean"],
+            } if is_classification else {
+                "mean_r2": all_metrics["r2"]["mean"],
+                "mean_mae": all_metrics["mae"]["mean"],
+                "mean_rmse": all_metrics["rmse"]["mean"],
+            }),
         })
 
-    # Overall Observed Failure Boundary
-    overall_boundary = None
-    for agg in severity_aggregates:
-        if agg["macro_f1"]["mean"] < failure_threshold:
-            overall_boundary = agg["severity"]
-            break
+    overall_boundary = next(
+        (item["severity"] for item in severity_aggregates if item["is_failed"]),
+        None,
+    )
+    primary_values = [item["score"]["mean"] for item in severity_aggregates]
+    worst_index = (
+        int(np.argmax(primary_values)) if lower_is_better
+        else int(np.argmin(primary_values))
+    )
+    worst_case = severity_aggregates[worst_index]
+    baseline_primary = float(np.mean(baseline_primary_scores))
+    primary_worst = worst_case["score"]["mean"]
+    # Baseline and worst-case measure the selected metric, never a different one.
+    baseline_metrics = {metric_name: round(baseline_primary, 6)}
+    worst_case_metrics = {
+        key: worst_case["metrics"][key]["mean"] for key in metric_keys
+    }
 
-    # Feature Vulnerabilities Ranking
     feature_vulnerabilities = []
     for fname, drops in feature_vuln_accs.items():
         mean_drop = float(np.mean(drops)) if drops else 0.0
         feature_vulnerabilities.append({
             "feature": fname,
-            "drop": round(mean_drop, 4),
+            "metric": metric_name,
+            "drop": round(mean_drop, 6),
             "caveat": "Empirical sensitivity — not a causal explanation.",
         })
     feature_vulnerabilities.sort(key=lambda x: x["drop"], reverse=True)
     for i, fv in enumerate(feature_vulnerabilities):
         fv["rank"] = i + 1
 
-    # Write output files
-    # 1. curves.csv
+    # Persist measured metric names, not classification aliases for regression.
     curves_csv_path = output_dir / "curves.csv"
-    with open(curves_csv_path, "w", newline="", encoding="utf-8") as f:
-        writer = csv.DictWriter(f, fieldnames=[
-            "severity", "mean_macro_f1", "sem_macro_f1", "ci_lower", "ci_upper", "mean_accuracy", "sem_accuracy"
-        ])
+    with open(curves_csv_path, "w", newline="", encoding="utf-8") as file:
+        writer = csv.DictWriter(file, fieldnames=list(curve_data[0].keys()))
         writer.writeheader()
         writer.writerows(curve_data)
 
-    # 2. results.json & aggregate_results.json
+    if is_classification:
+        baseline_metrics.update({
+            "f1": round(float(np.mean(base_f1s)), 6),
+            "accuracy": round(float(np.mean(base_accs)), 6),
+        })
+    else:
+        baseline_metrics.update({
+            "r2": round(float(np.mean(base_f1s)), 6),
+            "mae": round(float(np.mean(base_accs)), 6),
+        })
+
     results_json_data = {
         "experiment_id": exp_name,
         "model_name": model_name,
-        "dataset_name": config.get("dataset", {}).get("name", "Custom Dataset"),
+        "dataset_name": config.get("experiment", {}).get("dataset", {}).get("name", "Custom Dataset"),
         "task_type": task_type,
         "stress_type": stress_type,
+        "metric": metric_name,
+        "metric_direction": "lower" if lower_is_better else "higher",
         "seeds": seeds,
-        "baseline_macro_f1": round(float(np.mean(base_f1s)), 4),
-        "baseline_accuracy": round(float(np.mean(base_accs)), 4),
-        "worst_case_macro_f1": round(float(np.min([agg["macro_f1"]["mean"] for agg in severity_aggregates])), 4),
-        "worst_case_accuracy": round(float(np.min([agg["accuracy"]["mean"] for agg in severity_aggregates])), 4),
-        "worst_case_severity": severities[-1],
+        "baseline_metrics": baseline_metrics,
+        "worst_case_metrics": worst_case_metrics,
+        "baseline_macro_f1": baseline_metrics.get("f1") if is_classification else None,
+        "baseline_accuracy": baseline_metrics.get("accuracy") if is_classification else None,
+        "worst_case_macro_f1": worst_case_metrics.get("f1") if is_classification else None,
+        "worst_case_accuracy": worst_case_metrics.get("accuracy") if is_classification else None,
+        "worst_case_severity": worst_case["severity"],
         "observed_boundary": overall_boundary,
         "observed_boundary_caveat": "Observed failure boundary under the specified experimental configuration.",
         "failure_threshold": failure_threshold,
@@ -473,30 +574,51 @@ def main() -> int:
     with open(agg_path, "w", encoding="utf-8") as f:
         json.dump(results_json_data, f, indent=2)
 
-    # 3. report.md
+    # 3. Research report with correct metric names and direction.
     report_path = output_dir / "report.md"
+    label = {"f1": "Macro-F1", "r2": "R²", "mae": "MAE", "rmse": "RMSE"}.get(
+        metric_name, metric_name.upper()
+    )
+    boundary_text = (
+        f"s* = {overall_boundary:.4f}" if overall_boundary is not None
+        else "Not observed within evaluated severity range"
+    )
     report_content = f"""# Model Autopsy Report — {exp_name}
 
-## Executive Summary
+## Experiment Summary
 - **Model:** {model_name}
-- **Task Type:** {task_type.title()}
-- **Stress Type:** {stress_type}
-- **Baseline Macro-F1:** {results_json_data['baseline_macro_f1']:.4f}
-- **Worst-Case Macro-F1:** {results_json_data['worst_case_macro_f1']:.4f}
-- **Observed Failure Boundary:** {f"s* = {overall_boundary:.2f}" if overall_boundary is not None else "Unobserved (s* > max)"}
+- **Task:** {task_type}
+- **Stress:** {stress_type}
+- **Evaluation metric:** {label} ({'lower' if lower_is_better else 'higher'} is better)
+- **Baseline {label}:** {baseline_primary:.6f}
+- **Worst-case {label}:** {primary_worst:.6f}
+- **Worst evaluated severity:** {worst_case['severity']:.4f}
+- **Observed failure boundary:** {boundary_text}
+- **Seeds:** {len(seeds)}
 - **Caveat:** Observed failure boundary under the specified experimental configuration.
 
 ## Empirical Feature Sensitivity
-| Rank | Feature | Performance Drop | Interpretation |
+| Rank | Feature | {label} degradation | Interpretation |
 | :--- | :--- | :--- | :--- |
 """
     for fv in feature_vulnerabilities[:5]:
-        report_content += f"| {fv['rank']} | `{fv['feature']}` | {fv['drop']:.4f} | Empirical sensitivity — not a causal explanation. |\n"
+        report_content += (
+            f"| {fv['rank']} | `{fv['feature']}` | {fv['drop']:.6f} | "
+            "Empirical sensitivity — not a causal explanation. |\n"
+        )
 
-    report_content += """\n## Severity Aggregates (Multi-Seed)\n| Severity | Macro-F1 (Mean ± SEM) | Accuracy (Mean) | Status |\n| :--- | :--- | :--- | :--- |\n"""
+    report_content += f"""
+## Severity Aggregates
+| Severity | Mean {label} | SEM | Status |
+| :--- | :--- | :--- | :--- |
+"""
     for agg in severity_aggregates:
+        score = agg["score"]
+        sem = f"{score['sem']:.6f}" if score["sem"] is not None else "N/A (one seed)"
         status_str = "FAILED" if agg["is_failed"] else "PASS"
-        report_content += f"| {agg['severity']:.2f} | {agg['macro_f1']['mean']:.4f} ± {agg['macro_f1']['sem']:.4f} | {agg['accuracy']['mean']:.4f} | {status_str} |\n"
+        report_content += (
+            f"| {agg['severity']:.4f} | {score['mean']:.6f} | {sem} | {status_str} |\n"
+        )
 
     with open(report_path, "w", encoding="utf-8") as f:
         f.write(report_content)

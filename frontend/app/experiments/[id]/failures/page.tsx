@@ -81,7 +81,7 @@ function FailureExplorerContent() {
   const filteredSamples = samples.filter((s) => {
     if (selectedClass !== 'All' && s.trueLabel !== selectedClass) return false;
     if (selectedSeverity !== 'All' && s.severity !== parseFloat(selectedSeverity)) return false;
-    if (s.confidence > confidenceRange[1]) return false;
+    if (s.confidence !== null && s.confidence > confidenceRange[1]) return false;
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       return (
@@ -108,7 +108,7 @@ function FailureExplorerContent() {
       s.sampleIndex,
       s.trueLabel,
       s.predictedLabel,
-      s.confidence.toFixed(3),
+      s.confidence === null ? 'unavailable' : s.confidence.toFixed(3),
       s.stressType,
       s.severity,
     ]);

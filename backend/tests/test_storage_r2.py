@@ -165,13 +165,9 @@ def test_8_safe_key_generation_and_path_traversal(tmp_path):
     service = StorageService()
     service.access_key_id = None  # Force local path resolution
 
-    malicious_key = "../../etc/passwd"
-    resolved_path = service.get_local_path(malicious_key)
-    # Resolved path must NOT be outside the artifacts/datasets base directory
-    assert ".." not in str(resolved_path)
-    assert resolved_path.is_relative_to(settings.ARTIFACTS_BASE_DIR.resolve()) or (
-        resolved_path.is_relative_to(Path(__file__).parent.parent.parent.resolve())
-    )
+    with pytest.raises(ValueError, match="Invalid storage object key"):
+        service.get_local_path("../../etc/passwd")
+
 
 
 # =============================================================================
@@ -251,3 +247,71 @@ def test_12_failure_recovery_on_failed_storage():
 
     failing_service.delete_object("datasets/recovery-test/data.csv")
 
+
+
+@pytest.mark.parametrize("key", ["/etc/passwd", "a/../b", "a/./b", "a//b", "", "C:/temp", "a\\b"])
+def test_local_keys_reject_ambiguous_paths(key):
+    with pytest.raises(ValueError):
+        StorageService().get_local_path(key)
+
+
+def test_local_keys_reject_symlink_escape(tmp_path, monkeypatch):
+    root = tmp_path / "artifacts"
+    root.mkdir()
+    outside = tmp_path / "private"
+    outside.mkdir()
+    (root / "link").symlink_to(outside, target_is_directory=True)
+    monkeypatch.setattr(settings, "ARTIFACTS_BASE_DIR", root)
+    with pytest.raises(ValueError, match="escapes"):
+        StorageService().get_local_path("link/secret.txt")
+
+
+@pytest.mark.parametrize("method,args", [
+    ("retrieve_bytes", ("experiments/stale.json",)),
+    ("retrieve_file", ("experiments/stale.json", "unused.json")),
+    ("get_object_metadata", ("experiments/stale.json",)),
+    ("delete_object", ("experiments/stale.json",)),
+    ("list_objects", ("experiments",)),
+])
+def test_required_r2_failure_never_uses_local_copy(method, args, configured_storage, mock_s3_client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "ARTIFACTS_BASE_DIR", tmp_path)
+    monkeypatch.setattr(settings, "STORAGE_PROVIDER", "r2")
+    local = configured_storage.get_local_path("experiments/stale.json")
+    local.parent.mkdir(parents=True)
+    local.write_bytes(b"stale local content")
+    failure = ClientError({"Error": {"Code": "AccessDenied"}}, "TestOperation")
+    for operation in ("get_object", "download_file", "head_object", "delete_object", "get_paginator"):
+        getattr(mock_s3_client, operation).side_effect = failure
+    with pytest.raises(RuntimeError, match="local fallback is disabled"):
+        getattr(configured_storage, method)(*args)
+    assert local.read_bytes() == b"stale local content"
+
+
+def test_required_r2_existence_does_not_use_local_copy(configured_storage, mock_s3_client, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "ARTIFACTS_BASE_DIR", tmp_path)
+    monkeypatch.setattr(settings, "STORAGE_PROVIDER", "r2")
+    (tmp_path / "stale.json").write_bytes(b"stale")
+    mock_s3_client.head_object.side_effect = ClientError({"Error": {"Code": "404"}}, "HeadObject")
+    assert configured_storage.object_exists("stale.json") is False
+
+
+def test_r2_listing_collects_every_page(configured_storage, mock_s3_client):
+    from datetime import datetime, timezone
+    item = {"Size": 1, "LastModified": datetime.now(timezone.utc)}
+    mock_s3_client.get_paginator.return_value.paginate.return_value = [
+        {"Contents": [{**item, "Key": f"objects/{i}"} for i in range(1000)]},
+        {"Contents": [{**item, "Key": "objects/1000"}]},
+    ]
+    objects = configured_storage.list_objects("objects/")
+    assert len(objects) == 1001
+    assert objects[-1]["key"] == "objects/1000"
+
+
+def test_dataset_prefix_uses_dataset_root(tmp_path, monkeypatch):
+    service = StorageService()
+    service.access_key_id = None
+    monkeypatch.setattr(settings, "DATASETS_BASE_DIR", tmp_path / "datasets")
+    monkeypatch.setattr(settings, "ARTIFACTS_BASE_DIR", tmp_path / "artifacts")
+    service.store_bytes(b"a,b", "datasets/example/data.csv")
+    assert service.list_objects("datasets/")[0]["key"] == "datasets/example/data.csv"
+    assert service.get_local_path("datasets_other/data.csv") == tmp_path / "artifacts/datasets_other/data.csv"

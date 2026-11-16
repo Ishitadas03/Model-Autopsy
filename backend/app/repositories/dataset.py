@@ -3,7 +3,7 @@
 from typing import List, Optional
 from uuid import UUID
 
-from sqlalchemy import select
+from sqlalchemy import select, or_, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.dataset import Dataset
@@ -23,9 +23,16 @@ class DatasetRepository(BaseRepository[Dataset]):
         )
         return result.scalar_one_or_none()
 
-    async def get_active(self, task_type: Optional[str] = None) -> List[Dataset]:
+    async def get_active(self, task_type: Optional[str] = None, owner_id: Optional[UUID] = None) -> List[Dataset]:
         """Get active datasets, optionally filtered by task type."""
         query = select(Dataset).where(Dataset.is_active == True)
+        if owner_id is not None:
+            query = query.where(
+                or_(
+                    Dataset.owner_id == owner_id,
+                    and_(Dataset.is_public.is_(True), Dataset.owner_id.is_(None)),
+                )
+            )
         if task_type:
             query = query.where(Dataset.task_type == task_type)
         result = await self.session.execute(query.order_by(Dataset.name))
@@ -66,5 +73,5 @@ class DatasetRepository(BaseRepository[Dataset]):
         for data in defaults:
             existing = await self.get_by_dataset_id(data["dataset_id"])
             if not existing:
-                created.append(await self.create(**data))
+                created.append(await self.create(**data, is_public=True))
         return created

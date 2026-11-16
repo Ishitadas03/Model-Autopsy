@@ -187,7 +187,7 @@ export function SampleAnalysisCard({ sample }: SampleAnalysisCardProps) {
         </div>
         <div>
           <span className="text-[10px] font-cabin uppercase text-text-subtle block">Confidence</span>
-          <span className="text-white mt-0.5 block">{(sample.confidence * 100).toFixed(1)}%</span>
+          <span className="text-white mt-0.5 block">{sample.confidence === null ? 'Unavailable' : `${(sample.confidence * 100).toFixed(1)}%`}</span>
         </div>
         <div>
           <span className="text-[10px] font-cabin uppercase text-text-subtle block">Perturbation</span>

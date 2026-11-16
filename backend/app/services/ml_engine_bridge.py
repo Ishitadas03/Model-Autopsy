@@ -92,6 +92,8 @@ class MLEngineBridge:
                     "name": request_data.get("dataset_name", "Iris Dataset"),
                     "id": request_data.get("dataset_id", "iris"),
                     "path": request_data.get("dataset_path"),
+                    "storage_key": request_data.get("dataset_storage_key"),
+                    "sha256": request_data.get("dataset_sha256"),
                     "target_column": request_data.get("target_column") or request_data.get("target_name"),
                     "test_size": request_data.get("test_size", 0.20),
                 },
@@ -127,7 +129,14 @@ class MLEngineBridge:
         progress_callback=None,
     ) -> Dict[str, Any]:
         """Run an ML engine experiment asynchronously."""
-        script_path = self._get_script_path(experiment_type, request_data.get("dataset_id"))
+        # UI-configured jobs always use the manifest-driven generic runner.
+        # Canonical E001-E006 research scripts are reserved for explicit CLI runs;
+        # they do not necessarily honor selected model/target/severity settings.
+        script_path = (
+            self.scripts_dir / "run_generic.py"
+            if request_data.get("use_generic")
+            else self._get_script_path(experiment_type, request_data.get("dataset_id"))
+        )
 
         # Create output directory
         output_dir = self.artifacts_dir / experiment_id
@@ -182,43 +191,59 @@ class MLEngineBridge:
 
         self._running_processes[experiment_id] = proc
 
+        # Drain stderr concurrently. Otherwise stderr pipe backpressure can
+        # deadlock the child before stdout finishes. Retain only the final 16 KiB.
+        stderr_tail = bytearray()
+
+        async def drain_stderr() -> None:
+            while True:
+                chunk = await proc.stderr.read(4096)
+                if not chunk:
+                    break
+                stderr_tail.extend(chunk)
+                if len(stderr_tail) > 16384:
+                    del stderr_tail[:-16384]
+
+        stderr_task = asyncio.create_task(drain_stderr())
+
         try:
-            # Track progress
             async for line in proc.stdout:
                 line_str = line.decode("utf-8", errors="replace").strip()
                 if line_str:
                     progress_data = self._parse_progress_line(line_str)
                     if progress_data and progress_callback:
                         await progress_callback(progress_data)
-
             await proc.wait()
+            await stderr_task
 
             if proc.returncode != 0:
-                stderr_bytes = await proc.stderr.read()
-                stderr = stderr_bytes.decode("utf-8", errors="replace")
+                stderr = stderr_tail.decode("utf-8", errors="replace")
                 logger.error(
                     "Experiment subprocess failed",
                     experiment_id=experiment_id,
                     returncode=proc.returncode,
                     stderr=stderr,
                 )
-                raise RuntimeError(f"Experiment failed with return code {proc.returncode}: {stderr}")
+                raise RuntimeError(f"Experiment subprocess exited with code {proc.returncode}")
 
-            # Collect artifacts
             artifacts = self._collect_artifacts(experiment_id, output_dir, seeds)
-
-            # Parse results
             results = self._parse_results(output_dir, seeds, request_data)
-
             logger.info("Experiment completed", experiment_id=experiment_id)
-
             return {
                 "artifacts": artifacts,
                 "results": results,
                 "output_dir": str(output_dir),
             }
-
         finally:
+            if proc.returncode is None:
+                proc.kill()
+                try:
+                    await asyncio.wait_for(proc.wait(), timeout=5)
+                except asyncio.TimeoutError:
+                    logger.error("Subprocess did not reap after kill", experiment_id=experiment_id)
+            if not stderr_task.done():
+                stderr_task.cancel()
+            await asyncio.gather(stderr_task, return_exceptions=True)
             self._running_processes.pop(experiment_id, None)
 
     def _parse_progress_line(self, line: str) -> Optional[ProgressData]:
@@ -357,6 +382,12 @@ class MLEngineBridge:
         baseline_metrics = target_data.get("baseline_metrics") or {}
         if not isinstance(baseline_metrics, dict):
             raise ValueError("baseline_metrics must be an object")
+        metric_name = str(target_data.get("metric") or request_data.get("evaluation_metric") or "f1").lower()
+        normalized_baseline = {
+            str(key): measured(value)
+            for key, value in baseline_metrics.items()
+            if measured(value) is not None
+        }
         baseline_f1 = measured(target_data.get("baseline_macro_f1"))
         if baseline_f1 is None:
             baseline_f1 = measured(baseline_metrics.get("macro_f1", baseline_metrics.get("f1")))
@@ -389,6 +420,8 @@ class MLEngineBridge:
             f1_score = measured(point.get("macro_f1", point.get("mean_macro_f1", point.get("f1"))))
             accuracy = measured(point.get("accuracy", point.get("mean_accuracy")))
             score = measured(point.get("score"))
+            if score is None and isinstance(point.get("metrics"), dict):
+                score = measured(point["metrics"].get(metric_name))
             if severity is None or (f1_score is None and accuracy is None and score is None):
                 raise ValueError("Severity curve point is missing measured severity or metric")
             curve_data.append({
@@ -411,10 +444,19 @@ class MLEngineBridge:
             zero = next((p for p in curve_data if p["severity"] == 0.0 and p["accuracy"] is not None), None)
             if zero is not None:
                 baseline_accuracy = zero["accuracy"]
-        if baseline_f1 is None and baseline_accuracy is None:
+        baseline_metric = normalized_baseline.get(metric_name)
+        if baseline_metric is None:
+            baseline_metric = baseline_f1 if metric_name == "f1" else baseline_accuracy
+        if baseline_f1 is None and baseline_accuracy is None and baseline_metric is None:
             raise ValueError("Experiment has no measured baseline; refusing synthetic metrics")
+        if baseline_metric is not None:
+            normalized_baseline.setdefault(metric_name, baseline_metric)
+        if baseline_f1 is not None:
+            normalized_baseline.setdefault("f1", baseline_f1)
+        if baseline_accuracy is not None:
+            normalized_baseline.setdefault("accuracy", baseline_accuracy)
         for point in curve_data:
-            point["baseline"] = baseline_f1
+            point["baseline"] = baseline_metric
 
         feature_vulns = target_data.get("feature_vulnerabilities") or []
         failed_samples = target_data.get("failed_samples") or []
@@ -445,7 +487,31 @@ class MLEngineBridge:
             ),
         )
 
+        raw_worst = target_data.get("worst_case_metrics") or {}
+        if not isinstance(raw_worst, dict):
+            raise ValueError("worst_case_metrics must be an object")
+        normalized_worst = {
+            str(key): measured(value)
+            for key, value in raw_worst.items()
+            if measured(value) is not None
+        }
+        if worst_f1 is not None:
+            normalized_worst.setdefault("f1", worst_f1)
+        if worst_accuracy is not None:
+            normalized_worst.setdefault("accuracy", worst_accuracy)
+        if metric_name not in normalized_worst:
+            values = [p for p in curve_data if p["score"] is not None]
+            if values:
+                lower_better = metric_name in {"mae", "rmse", "mse", "loss"}
+                extreme = max(values, key=lambda v: v["score"]) if lower_better else min(values, key=lambda v: v["score"])
+                normalized_worst[metric_name] = extreme["score"]
+                if worst_severity is None:
+                    worst_severity = extreme["severity"]
+
         return {
+            "metric": metric_name,
+            "baseline_metrics": normalized_baseline,
+            "worst_case_metrics": normalized_worst,
             "baseline_macro_f1": baseline_f1,
             "baseline_accuracy": baseline_accuracy,
             "worst_case_macro_f1": worst_f1,

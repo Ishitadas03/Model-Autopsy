@@ -3,6 +3,7 @@
 import React from 'react';
 import { TopBar } from './TopBar';
 import { Sidebar } from './Sidebar';
+import { AuthGuard } from '@/components/auth/AuthGuard';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -16,6 +17,7 @@ export function AppShell({
   experimentId,
 }: AppShellProps) {
   return (
+    <AuthGuard>
     <div className="relative min-h-screen text-text flex flex-col">
       {/* Top Glass Navigation Bar */}
       <TopBar />
@@ -27,5 +29,6 @@ export function AppShell({
         </main>
       </div>
     </div>
+    </AuthGuard>
   );
 }

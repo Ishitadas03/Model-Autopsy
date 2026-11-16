@@ -20,7 +20,7 @@ async function proxy(request: NextRequest, context: { params: Promise<{ path: st
   if (!backend.startsWith('https://') && process.env.NODE_ENV === 'production') {
     return NextResponse.json({ error: 'Invalid backend configuration' }, { status: 503 });
   }
-  const publicRead = method === 'GET' && (parts[0] === 'health' || parts[0] === 'models');
+  const publicRead = method === 'GET' && parts[0] === 'health';
   let token = request.cookies.get(ACCESS_COOKIE)?.value;
   let refreshed = null;
   if (!token && !publicRead) {

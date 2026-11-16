@@ -74,6 +74,11 @@ def test_rls_migration_protects_every_tenant_table(monkeypatch, migration):
     assert all("auth.uid()" in sql for sql in policies)
     assert not any("FOR ALL" in sql or "FOR INSERT" in sql or "FOR UPDATE" in sql for sql in policies)
     assert not any("DISABLE ROW LEVEL SECURITY" in sql for sql in statements)
+    assert any(
+        "REVOKE EXECUTE ON FUNCTION public.rls_auto_enable()" in sql
+        and "FROM PUBLIC, anon, authenticated" in sql
+        for sql in statements
+    )
 
 
 def test_rls_migration_never_disables_access_protection_on_rollback(migration):

@@ -42,6 +42,67 @@ jobs:
         working-directory: backend
         run: pytest -q tests
 
+  postgres-rls-acceptance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_DB: model_autopsy_ci
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d model_autopsy_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/model_autopsy_ci
+      APP_ENV: test
+      AUTH_REQUIRED: 'false'
+      STORAGE_PROVIDER: local
+      PGPASSWORD: postgres
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+      - name: Install backend and PostgreSQL test tools
+        run: |
+          pip install --upgrade pip
+          pip install -e './backend[dev]' psycopg2-binary
+      - name: Bootstrap isolated Supabase roles (CI only)
+        run: |
+          psql -h localhost -U postgres -d model_autopsy_ci -v ON_ERROR_STOP=1 <<'SQL'
+          CREATE ROLE anon NOLOGIN;
+          CREATE ROLE authenticated NOLOGIN;
+          CREATE SCHEMA auth;
+          CREATE FUNCTION auth.uid() RETURNS uuid
+            LANGUAGE sql STABLE
+            AS $
+              SELECT NULLIF(current_setting('request.jwt.claim.sub', true),'')::uuid
+            $;
+          GRANT USAGE ON SCHEMA auth TO authenticated;
+          GRANT EXECUTE ON FUNCTION auth.uid() TO authenticated;
+          CREATE FUNCTION public.rls_auto_enable() RETURNS void
+            LANGUAGE plpgsql SECURITY DEFINER
+            AS $ BEGIN NULL; END; $;
+          SQL
+      - name: Create original schema revision 001
+        working-directory: backend
+        run: alembic upgrade 001_initial_tables
+      - name: Preserve representative existing records
+        run: python backend/tests/postgres_rls_acceptance.py seed
+      - name: Execute real PostgreSQL tenant and queue migrations
+        working-directory: backend
+        run: alembic upgrade head
+      - name: Test two-user tenant isolation and legacy rows
+        run: python backend/tests/postgres_rls_acceptance.py verify
+
   frontend-tests:
     runs-on: ubuntu-latest
     timeout-minutes: 20
